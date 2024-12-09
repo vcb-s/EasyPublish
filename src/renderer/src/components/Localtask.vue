@@ -87,8 +87,7 @@
                         <el-table-column fixed="right" label="发布" width="80">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" 
-                                @click="toPublish(scope.$index)"
-                                :disabled="scope.row.isFinished == 'published'">
+                                @click="toPublish(scope.$index)">
                                     继续发布
                                 </el-button>
                             </template>
@@ -96,8 +95,7 @@
                         <el-table-column fixed="right" label="删除" width="80">
                             <template #default="scope">
                                 <el-button link type="danger" size="small" 
-                                @click="remove(scope.$index)"
-                                :disabled="scope.row.isFinished == 'published'">
+                                @click="remove(scope.$index)">
                                     删除
                                 </el-button>
                             </template>

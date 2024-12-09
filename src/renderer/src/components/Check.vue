@@ -150,8 +150,7 @@
                 <el-col :span="18">
                     <el-alert title="提示" 
                     description="从文件创建时，EasyPublish会在项目目录下创建文件副本并以此作为最终发布内容，修改发布搞时请修改该副本或直接在本页面修改，或返回上一页再次创建。在本页面修改时请点击保存按钮。"
-                    type="info" />
-                    <el-row style="height: 20px;" />
+                    type="info" style="margin-bottom: 20px;"/>
                     <div class="container" v-if="type == 1">
                         <div v-html="html_rendered"></div>
                     </div>

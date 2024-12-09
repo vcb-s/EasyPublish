@@ -157,7 +157,7 @@
                 tabledata[index].lock = false
                 tabledata[index].status = '发布完成'
                 tabledata[index].class = 'success-row'
-                publishtable.value!.toggleRowSelection( tabledata[index], true )
+                publishtable.value!.toggleRowSelection( tabledata[index], false )
                 loadData()
                 return
             }
