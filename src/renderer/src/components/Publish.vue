@@ -245,7 +245,7 @@
                     </el-table>
                     <el-row style="height: 20px;" />
                     <el-alert title="提示" 
-                    description="末日动漫存在萌番组的搬运站，若有单发需要请注意顺序，不建议使用批量发布同时发布上述两站"
+                    description="末日动漫存在萌番组和Nyaa的搬运站，若有单发需要请注意顺序，不建议使用批量发布同时发布上述网站"
                     type="info" />
                 </el-col>
                 <el-col :span="3" />

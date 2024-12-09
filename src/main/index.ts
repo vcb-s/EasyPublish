@@ -15,6 +15,7 @@ import { Low } from 'lowdb'
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
 import log from 'electron-log'
+import appIcon from '../../build/icon.ico?asset'
 
 /*
                    _ooOoo_
@@ -222,32 +223,38 @@ async function BTPublish(_event, id: number, type: string) {
           storage.acgnx_a = result.data.sync.acgnx
         }
         else{
-          storage.acgnx_a = '种子已存在'
+          if (!storage.acgnx_a)
+            storage.acgnx_a = '种子已存在'
         }
         if (result.data.sync.acgnx_int != '已存在相同的种子'){
           storage.acgnx_g = result.data.sync.acgnx_int
         }
         else{
-          storage.acgnx_g = '种子已存在'
+          if (!storage.acgnx_g)
+            storage.acgnx_g = '种子已存在'
         }
         if (result.data.sync.acgrip != '已存在相同的种子'){
           storage.acgrip = result.data.sync.acgrip
         }
         else{
-          storage.acgrip = '种子已存在'
+          if (!storage.acgrip)
+            storage.acgrip = '种子已存在'
         }
         if (result.data.sync.dmhy != '已存在相同的种子'){
           storage.dmhy = result.data.sync.dmhy
         }
         else{
-          storage.dmhy = '种子已存在'
+          if (!storage.dmhy)
+            storage.dmhy = '种子已存在'
         }
         await db.write()
         return 'success'
       }
       else if (response.data.success === false && (response.data.message as string).includes('torrent same as')) {
-        storage.bangumi = '种子已存在'
-        await db.write()
+        if (!storage.bangumi) {
+          storage.bangumi = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       else {
@@ -277,8 +284,10 @@ async function BTPublish(_event, id: number, type: string) {
         return 'success'
       }
       else if (response.data.success === false && (response.data.message as string).includes('torrent same as')) {
-        storage.bangumi = '种子已存在'
-        await db.write()
+        if (!storage.bangumi) {
+          storage.bangumi = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       else {
@@ -307,8 +316,10 @@ async function BTPublish(_event, id: number, type: string) {
         return 'success'
       }
       else if((response.data as string).includes('This torrent already exists')) {
-        storage.nyaa = '种子已存在'
-        await db.write()
+        if (!storage.nyaa) {
+          storage.nyaa = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       else {
@@ -343,8 +354,10 @@ async function BTPublish(_event, id: number, type: string) {
       const response = await axios.post('https://www.dmhy.org/topics/add', formData, { responseType: 'text' })
       if (response.status != 200) throw response
       if ((response.data as string).includes('種子已存在，請不要重複上傳')) {
-        storage.dmhy = '种子已存在'
-        await db.write()
+        if (!storage.dmhy) {
+          storage.dmhy = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       if ((response.data as string).includes('上傳成功')) {
@@ -401,8 +414,10 @@ async function BTPublish(_event, id: number, type: string) {
         return 'success'
       }
       if ((response.data as string).includes('閣下所要上載的Torrent檔案已存在')) {
-        storage.acgnx_a = '种子已存在'
-        await db.write()
+        if (!storage.acgnx_a) {
+          storage.acgnx_a = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       else {
@@ -444,8 +459,10 @@ async function BTPublish(_event, id: number, type: string) {
         return 'success'
       }
       if ((response.data as string).includes('The Torrent file you are going to upload is already there')) {
-        storage.acgnx_g = '种子已存在'
-        await db.write()
+        if (!storage.acgnx_g) {
+          storage.acgnx_g = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       else {
@@ -478,7 +495,7 @@ async function BTPublish(_event, id: number, type: string) {
       formData.append('post[content]', bbcode)
       formData.append('commit', '发布')
       const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text' })
-      if ((response.status == 302)) {
+      if (response.status == 302) { 
         cookievalue = response.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
         db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))!.value = cookievalue
         await db.write()
@@ -498,7 +515,7 @@ async function BTPublish(_event, id: number, type: string) {
           await db.write()
           postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
         }
-        if (src = '')
+        if (src == '')
           storage.acgrip = '未找到链接'
         else
           storage.acgrip = 'https://acg.rip' + src
@@ -506,8 +523,10 @@ async function BTPublish(_event, id: number, type: string) {
         return 'success'
       }
       if ((response.data as string).includes('已存在相同的种子')) {
-        storage.acgrip = '种子已存在'
-        await db.write()
+        if (!storage.acgrip) {
+          storage.acgrip = '种子已存在'
+          await db.write()
+        }
         return 'exist'
       }
       else {
@@ -1099,33 +1118,33 @@ async function getPublishInfo(_event, id: number) {
       else
         result.push({site: 'bangumi', status: '发布完成'})
     if (storage.nyaa) 
-      if (storage.bangumi == '种子已存在') 
+      if (storage.nyaa == '种子已存在') 
         result.push({site: 'nyaa', status: '种子已存在'})
       else
         result.push({site: 'nyaa', status: '发布完成'})
     if (storage.acgrip) 
-      if (storage.bangumi == '种子已存在') 
+      if (storage.acgrip == '种子已存在') 
         result.push({site: 'acgrip', status: '种子已存在'})
       else
         result.push({site: 'acgrip', status: '发布完成'})
     if (storage.dmhy) 
-      if (storage.bangumi == '种子已存在') 
+      if (storage.dmhy == '种子已存在') 
         result.push({site: 'dmhy', status: '种子已存在'})
       else
         result.push({site: 'dmhy', status: '发布完成'})
     if (storage.acgnx_a) 
-      if (storage.bangumi == '种子已存在') 
+      if (storage.acgnx_a == '种子已存在') 
         result.push({site: 'acgnx_a', status: '种子已存在'})
       else
         result.push({site: 'acgnx_a', status: '发布完成'})
     if (storage.acgnx_g) 
-      if (storage.bangumi == '种子已存在') 
+      if (storage.acgnx_g == '种子已存在') 
         result.push({site: 'acgnx_g', status: '种子已存在'})
       else
         result.push({site: 'acgnx_g', status: '发布完成'})
     storage.step = 'publish'
     await db.write()
-    return result
+    return JSON.stringify(result)
   }
   catch(err){
     dialog.showErrorBox('错误', (err as Error).message)
@@ -1184,6 +1203,7 @@ async function getSiteSrc(_event, id: number) {
     if (!fs.existsSync(storage.path)) 
       throw new Error('FolderNotFound:' + id)
     storage.step = 'finish'
+    storage.status = 'published'
     await db.write()
     return storage.site ? storage.site : ''
   }
@@ -1204,7 +1224,7 @@ async function clearStorage(_event) {
 }
 
 //写入剪切板
-function writeClipboard(_event, str) {
+function writeClipboard(_event, str: string) {
   clipboard.writeText(str)
 }
 
@@ -1224,7 +1244,8 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-    }
+    },
+    icon: appIcon,
   })
   mainWindowWebContent = mainWindow.webContents
 

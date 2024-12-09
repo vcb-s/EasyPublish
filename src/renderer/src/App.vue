@@ -37,15 +37,15 @@
       <!-- 标题栏 -->
       <el-header class="header">
         &nbsp;EasyPublish
-        <el-button text circle type="danger" size="large" 
+        <el-button text circle type="danger" 
         style="position: absolute; right: 10px;" @click="WinClose">
           <el-icon :size="30"><Close /></el-icon>
         </el-button>
-        <el-button text circle type="info" size="large" 
+        <el-button text circle type="info" 
         style="position: absolute; right: 50px;" @click="WinMax">
           <el-icon :size="25"><FullScreen /></el-icon>
         </el-button>
-        <el-button text circle type="info" size="large" 
+        <el-button text circle type="info" 
         style="position: absolute; right: 90px;" @click="WinMini">
           <el-icon :size="29"><Minus /></el-icon>
         </el-button>

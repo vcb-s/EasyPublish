@@ -208,7 +208,7 @@
                     plain>
                         刷新
                     </el-button>
-                    <el-table style="width: 100%;" :data="tabledata" :row-class-name="tableRowClassName">
+                    <el-table style="width: 100%;" row-key="index" :data="tabledata" :row-class-name="tableRowClassName">
                         <el-table-column fixed="right" label="登录" width="100">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" @click="login(scope.$index)">登录账号</el-button>
