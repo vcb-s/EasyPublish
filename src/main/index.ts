@@ -1,7 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Cookie, session, clipboard } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
 import type { PublishConfig, 
   Content_file, 
   Message_PublishStatus,
@@ -628,6 +627,7 @@ async function createLoginWindow(type: string) {
     height: 550,
     autoHideMenuBar: true,
     show: false,
+    icon: appIcon,
   })
 
   loginWindow.on('ready-to-show', async () => {
@@ -1241,7 +1241,6 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
     },

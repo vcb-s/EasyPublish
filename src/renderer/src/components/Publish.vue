@@ -2,6 +2,7 @@
     import { defineProps, onMounted, ref, reactive } from "vue"
     import { useRouter } from 'vue-router'
     import type {Message_PublishStatus} from '../index.d.ts'
+    import type { TableInstance } from 'element-plus'
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
@@ -102,6 +103,7 @@
 
     //设置是否允许选择
     const selectable = (row: Tabledata) => !(row.status == '发布完成')
+    const publishtable = ref<TableInstance>()
     const multipleSelection = ref<Tabledata[]>([])
     const handleSelectionChange = (val: Tabledata[]) => {
         multipleSelection.value = val
@@ -155,6 +157,7 @@
                 tabledata[index].lock = false
                 tabledata[index].status = '发布完成'
                 tabledata[index].class = 'success-row'
+                publishtable.value!.toggleRowSelection( tabledata[index], true )
                 loadData()
                 return
             }
@@ -227,6 +230,7 @@
                     </div>
                     <el-row style="height: 40px;" />
                     <el-table style="width: 100%;" :data="tabledata" 
+                    ref="publishtable"
                     :row-class-name="tableRowClassName"
                     @selection-change="handleSelectionChange">
                         <el-table-column fixed="right" label="发布" width="80">
