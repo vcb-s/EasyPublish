@@ -10,6 +10,7 @@ import Site from '../components/Site.vue'
 import Finish from '../components/Finish.vue'
 import Login from '../components/Login.vue'
 import Localtask from '../components/Localtask.vue'
+import Quickstart from '../components/Quickstart.vue'
 
 const router = createRouter(
     {
@@ -70,6 +71,11 @@ const router = createRouter(
                 name: 'localtask',
                 path: '/localtask', 
                 component: Localtask
+            },
+            {
+                name: 'quickstart',
+                path: '/quickstart', 
+                component: Quickstart
             },
         ],
         history:createWebHashHistory()

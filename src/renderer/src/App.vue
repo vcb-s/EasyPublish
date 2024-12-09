@@ -109,7 +109,7 @@
             </el-menu-item>
             <el-menu-item index="/login">
               <el-icon><Key /></el-icon>
-              <span>登录管理</span>
+              <span>登录管理</span> 
             </el-menu-item>
             <el-menu-item index="/quickstart">
               <el-icon><CircleCheck /></el-icon>

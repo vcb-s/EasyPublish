@@ -49,6 +49,7 @@ declare module 'vue' {
     Login: typeof import('./src/components/Login.vue')['default']
     New: typeof import('./src/components/New.vue')['default']
     Publish: typeof import('./src/components/Publish.vue')['default']
+    Quickstart: typeof import('./src/components/Quickstart.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Site: typeof import('./src/components/Site.vue')['default']

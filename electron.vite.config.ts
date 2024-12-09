@@ -27,6 +27,6 @@ export default defineConfig({
         resolvers: [ElementPlusResolver()],
       }),
       vue(),
-      vueDevTools()]
-  }
+      vueDevTools()
+  ]}
 })
