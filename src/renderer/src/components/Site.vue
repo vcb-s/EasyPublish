@@ -110,6 +110,12 @@
         title.value = result[7]
     }
 
+    //右键复制事件
+    function handleRightClick(str: string) {
+        window.api.WriteClipboard(str)
+        ElMessage('复制成功')
+    }
+
     onMounted(() => {
         setscrollbar()
         loadData()
@@ -164,7 +170,7 @@
                     </div>
                     <el-collapse>
                         <el-collapse-item title="BT链接">
-                            <p v-for="item in publishInfo">{{ item }}</p>
+                            <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
                         </el-collapse-item>
                     </el-collapse>
                     <el-row style="height: 20px;" />

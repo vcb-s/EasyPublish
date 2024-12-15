@@ -169,7 +169,7 @@
     }
 
     //右键复制事件
-    function handleRightClick(str) {
+    function handleRightClick(str: string) {
         window.api.WriteClipboard(str)
         ElMessage('复制成功')
     }

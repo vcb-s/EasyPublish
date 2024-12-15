@@ -3,22 +3,18 @@
 </script>
 
 <template>
-<el-row style="height: 20px;" />
-    <el-row justify="space-between">
-        <el-col :span="3" />
-        <el-col :span="18">
-            <div style="width: 380px;">
-                <img src="../assets/icon.png" />
-            </div>
-            当前版本：1.0.0-alpha.3<br />
-            项目地址：<a href="https://github.com/Asendaushoe/EasyPublish">https://github.com/Asendaushoe/EasyPublish</a><br />
-            这个快速开始让我吃了，去项目页看吧。
-        </el-col>
-        <el-col :span="3" />
-    </el-row>
+<div style="margin-left: 20px;">
+    <div style="width: 380px;">
+        <img src="../assets/icon.png" />
+    </div>
+    <br />
+    当前版本：1.0.0-beta.1<br />
+    项目地址：<a href="https://github.com/Asendaushoe/EasyPublish">https://github.com/Asendaushoe/EasyPublish</a><br />
+    这个快速开始让我吃了，去项目页看吧。
+</div>
 </template>
 
-<style scope>
+<style scoped>
 img{
     width: 100%;
     height: 100%;
