@@ -133,7 +133,7 @@ EasyPublish在发布之前会再次检查登录状态，若出现异常请前往
 
 右上有可以切换明暗主题的滑块。
 
-从前就听说Electron打包体积和资源占用夸张，真是一点也不客气。
+从前就听说Electron打包体积和资源占用夸张，还真是一点也不客气。
 
 有问题出BUG找Asen。
 
@@ -142,6 +142,23 @@ EasyPublish在发布之前会再次检查登录状态，若出现异常请前往
 *代码是一坨的，BUG是一堆的。* 
 
 *功能是勉强能用的，优化是一点没有的。* 
+
+------
+
+## 开源许可
+
+| 项目         | 库                                                           |
+| ------------ | ------------------------------------------------------------ |
+| electron     | [https://github.com/electron/electron](https://github.com/electron/electron) |
+| vue          | [https://github.com/vuejs/core](https://github.com/vuejs/core) |
+| vue-router   | [https://github.com/vuejs/router](https://github.com/vuejs/router) |
+| axios        | [https://github.com/axios/axios](https://github.com/axios/axios) |
+| axios-retry  | [https://github.com/softonic/axios-retry](https://github.com/softonic/axios-retry) |
+| element-plus | [https://github.com/element-plus/element-plus](https://github.com/element-plus/element-plus) |
+| electron-log | [https://github.com/megahertz/electron-log](https://github.com/megahertz/electron-log) |
+| lowdb        | [https://github.com/typicode/lowdb](https://github.com/typicode/lowdb) |
+| bbob         | [https://github.com/JiLiZART/bbob](https://github.com/JiLiZART/bbob) |
+| marked       | [https://github.com/markedjs/marked](https://github.com/markedjs/marked) |
 
 ------
 
