@@ -70,7 +70,7 @@
                 <el-select v-model="form.type" placeholder="选择一种协议">
                   <el-option label="HTTP" value="http" />
                   <el-option label="HTTPS" value="https" />
-                  <el-option label="SOCKS5" value="socks5" />
+                  <el-option label="SOCKS5" value="socks" />
                 </el-select>
               </el-form-item>
               <el-form-item label="代理主机">

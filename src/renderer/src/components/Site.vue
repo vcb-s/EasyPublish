@@ -1,7 +1,7 @@
 <script setup lang="ts" name="Site">
     import { defineProps, onMounted, ref } from "vue"
     import { useRouter } from 'vue-router'
-    import { Upload } from '@element-plus/icons-vue'
+    import { Upload, Search } from '@element-plus/icons-vue'
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
@@ -19,6 +19,15 @@
     }
 
     //数据
+    type Tabledata = {
+        id: number
+        title: string
+        content: string
+    }
+    const isRS = ref<boolean>(false)
+    const rstitle = ref<string>('')
+    const rsID = ref<number>(0)
+    const tableData = ref<Tabledata[]>([])
     const publishInfo = ref<string[]>([])
     const content = ref<string>('')
     const title = ref<string>('')
@@ -46,6 +55,17 @@
             value: 24
         },
     ]
+
+    //RS搜索文章
+    async function searchPosts() {
+        const result = await window.api.SearchPosts(rstitle.value)
+        tableData.value = result
+    }
+
+    //RS选择文章
+    function handleCurrentChange(val: Tabledata | undefined) {
+        rsID.value = val ? val.id : 0
+    }
 
     //上传文件
     const isLoading = ref(false)
@@ -78,7 +98,11 @@
     //提交发布内容
     const isPublishing = ref(false)
     async function submit() {
-        const result = await window.api.SitePublish(props.id ,JSON.stringify(category.value), imgsrc.value, title.value, content.value)
+        let result: string
+        if (isRS)
+            result = await window.api.SiteRSPublish(props.id, rsID.value, title.value, content.value)
+        else
+            result = await window.api.SitePublish(props.id ,JSON.stringify(category.value), imgsrc.value, title.value, content.value)
         if (result == 'empty')
             ElMessage.error('标题或内容为空')
         else if (result == 'unauthorized') 
@@ -144,7 +168,7 @@
                                 <el-input v-model="title" placeholder="请填写标题"/>
                             </el-form-item>
                             <el-form-item label="主站发布图">
-                                <el-input placeholder="选择一个文件" v-model="imgsrc" class="input-with-select">
+                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imgsrc">
                                     <template #append>
                                         <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
@@ -165,6 +189,38 @@
                                         :value="item.value"
                                     />
                                 </el-select>
+                            </el-form-item>
+                            <el-form-item label="RS选项">
+                                <el-checkbox v-model="isRS" label="RS覆盖原帖" />
+                            </el-form-item>
+                            <el-form-item v-show="isRS" label="选择RS文章">
+                                <el-input placeholder="输入标题以进行搜索" v-model="rstitle">
+                                    <template #append>
+                                        <el-button :icon="Search" @click="searchPosts()" />
+                                    </template>
+                                </el-input>
+                                <el-table :data="tableData" highlight-current-row
+                                @current-change="handleCurrentChange">
+                                    <el-table-column prop="id" label="ID" width="70" />
+                                    <el-table-column label="文章标题">
+                                        <template #default="scope">
+                                            <el-popover
+                                                placement="bottom"
+                                                title="文章内容"
+                                                :width="800"
+                                                trigger="hover"
+                                                raw-content
+                                            >
+                                                <template #reference>
+                                                    {{ scope.row.title }}
+                                                </template>
+                                                <template #default>
+                                                    <div v-html="scope.row.content" />
+                                                </template>
+                                            </el-popover>
+                                        </template>
+                                    </el-table-column>
+                                </el-table>
                             </el-form-item>
                         </el-form>
                     </div>

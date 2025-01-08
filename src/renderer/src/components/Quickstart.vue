@@ -8,8 +8,8 @@
         <img src="../assets/icon.png" />
     </div>
     <br />
-    当前版本：1.0.0-beta.1<br />
-    项目地址：<a href="https://github.com/Asendaushoe/EasyPublish">https://github.com/Asendaushoe/EasyPublish</a><br />
+    当前版本：1.0.0-beta.2<br />
+    项目地址：<a href="https://github.com/vcb-s/EasyPublish">hhttps://github.com/vcb-s/EasyPublish</a><br />
     这个快速开始让我吃了，去项目页看吧。
 </div>
 </template>
