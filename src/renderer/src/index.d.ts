@@ -93,3 +93,9 @@ export interface ProxyConfig{
   host: string
   port: number
 }
+
+export interface Message_rsPosts{
+  id: number
+  title: string
+  content: string
+}
