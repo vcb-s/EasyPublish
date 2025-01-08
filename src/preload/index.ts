@@ -31,9 +31,11 @@ const api = {
   SetSiteUAP: async (op: boolean, username: string, password: string) => await ipcRenderer.invoke('setSiteUAP', op, username, password),
   Publish: async (id: number, type: string) => await ipcRenderer.invoke('publish', id, type),
   SitePublish: async (id: number, categories: string, imgsrc: string, title: string, content: string) => await ipcRenderer.invoke('sitePublish', id, title, content, imgsrc, categories),
+  SiteRSPublish: async (id: number, rsID: number, title: string, content: string) => await ipcRenderer.invoke('siteRSPublish', id, rsID, title, content),
   GetSiteSrc: async (id: number) => await ipcRenderer.invoke('getSiteSrc', id),
   ClearStorage: () => ipcRenderer.send('clearStorage'),
-  WriteClipboard: (str: string) => ipcRenderer.send('writeClipboard', str)
+  WriteClipboard: (str: string) => ipcRenderer.send('writeClipboard', str),
+  SearchPosts: (str: string) =>ipcRenderer.invoke("searchPosts", str),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -5,6 +5,7 @@ import type {
   Message_LoginInfo, 
   Message_ProxyConfig, 
   Message_TaskInfo,
+  Message_rsPosts,
   } from '../renderer/src/index.d.ts'
 
 export interface IElectronAPI {
@@ -38,9 +39,11 @@ export interface IElectronAPI {
   SetSiteUAP: (op: boolean, username: string, password: string) => Promise<string[]>
   Publish: (id: number, type: string) => Promise<string>
   SitePublish: (id: number, categories: string, imgsrc: string, title: string, content: string) => Promise<string>
+  SiteRSPublish: (id: number, rsID: number, title: string, content: string) => Promise<string>
   GetSiteSrc: (id: number) => Promise<string>
   ClearStorage: () => void
   WriteClipboard: (str: string) => void
+  SearchPosts: (str: string) => Promise<Message_rsPosts[]>
 }
 
 declare global {

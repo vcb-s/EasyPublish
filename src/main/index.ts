@@ -7,6 +7,7 @@ import type { PublishConfig,
   Message_LoginInfo, 
   Message_UAP,
   ProxyConfig, 
+  Message_rsPosts,
 } from '../renderer/src/index.d.ts'
 import fs from 'fs'
 import { JSONFilePreset } from 'lowdb/node'
@@ -14,6 +15,7 @@ import { Low } from 'lowdb'
 import axios from 'axios'
 import axiosRetry from 'axios-retry'
 import log from 'electron-log'
+import socksProxy from 'socks-proxy-agent'
 import appIcon from '../../build/icon.ico?asset'
 
 /*
@@ -142,6 +144,24 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+//获取当前日期函数
+function getNowFormatDate() {
+  let date = new Date(),
+    year = date.getFullYear(), //获取完整的年份(4位)
+    month = date.getMonth() + 1, //获取当前月份(0-11,0代表1月)
+    strDate = date.getDate(),
+    hour = date.getHours(), //获取当前小时(0 ~ 23)
+    minute = date.getMinutes(), //获取当前分钟(0 ~ 59)
+    second = date.getSeconds() //获取当前秒数(0 ~ 59) // 获取当前日(1-31)
+  let m: string, d: string, h: string, s: string, mi: string;
+  m = month < 10 ? `0${month}` : month.toString()
+  d = strDate < 10 ? `0${strDate}` : strDate.toString() 
+  h = hour < 10 ? `0${hour}` : hour.toString()
+  mi = minute < 10 ? `0${minute}` : minute.toString()
+  s = second < 10? `0${second}` : second.toString()
+  return `${year}-${m}-${d}T${h}:${mi}:${s}`
+}
+
 //axios拦截添加cookie和useragent,主站设置认证
 axios.interceptors.request.use(
   config => {
@@ -217,7 +237,13 @@ async function BTPublish(_event, id: number, type: string) {
       if (response.data.success === true) {
         storage.bangumi = 'https://bangumi.moe/torrent/' + response.data.torrent._id
         await sleep(1000)
-        const result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
+        let result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
+        for (let index = 0; index < 5; index++) {
+          if (result.status == 200) 
+            break
+          await sleep(1000)
+          result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
+        }
         if (result.data.sync.acgnx != '已存在相同的种子'){
           storage.acgnx_a = result.data.sync.acgnx
         }
@@ -575,6 +601,30 @@ async function sitePublish(_event, id: number, title: string, content: string, i
   }
 }
 
+//RS主站发布
+async function siteRSPublish(_event, id: number, rsID: number, title: string, content: string) {
+  try{
+    let data = {
+      date: getNowFormatDate(),
+      title: title,
+      content: content,
+    }
+    const response = await axios.patch('https://vcb-s.com/wp-json/wp/v2/posts/' + rsID, data, {responseType: 'json'})
+    if (response.status == 200) {
+      db.data.posts.find((item) => item.id == id)!.site = response.data.link
+      return 'success'
+    }
+    console.log(response)
+    if (response.status == 400) return 'empty'
+    if (response.status == 401) return 'unauthorized'
+    throw response
+  }
+  catch (err) {
+    console.log(err)
+    return 'failed'
+  }
+}
+
 //获取Bangumi标签建议
 async function getBangumiTags(_event, query: string) {
   try{
@@ -595,6 +645,20 @@ async function searchBangumiTags(_event, query: string) {
     log.error(err)
     return {data: (err as any).name, status: 0}
   }
+}
+
+//RS搜索文章
+async function searchPosts(_event, title: string) {
+  let result: Message_rsPosts[] = []
+  const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?search=' + title, { responseType: 'json' })
+  response.data.forEach(item => {
+    result.push({
+      id: item.id,
+      title: item.title.rendered,
+      content: item.content.rendered.split('<!--more-->')[0]
+    })
+  })
+  return result
 }
 
 //登录窗口设置
@@ -635,12 +699,19 @@ async function createLoginWindow(type: string) {
   })
   
   loginWindow.on('close', async (e) => {
-    e.preventDefault()
-    await setCookies(type, url)
-    await checkLoginStatus(type)
-    //告知页面刷新数据
-    mainWindowWebContent.send('refreshLoginData')
-    loginWindow.destroy()
+    try{
+      e.preventDefault()
+      await setCookies(type, url)
+      await checkLoginStatus(type)
+      //告知页面刷新数据
+      mainWindowWebContent.send('refreshLoginData')
+    }
+    catch(err){
+      console.log(err)
+    }
+    finally{
+      loginWindow.destroy()
+    }
   })
 
   //拦截设置useragent
@@ -1301,7 +1372,7 @@ app.whenReady().then(async () => {
   //设置应用数据库
   db = await JSONFilePreset<Data>('easypublish-db.json', defaultData)
   await db.write()
-  //响应式通信
+  //响应通信
   ipcMain.handle('openFile', handleFileOpen)
   ipcMain.handle('createTask', createTask)
   ipcMain.handle("createWithFile", createWithFile)
@@ -1320,8 +1391,10 @@ app.whenReady().then(async () => {
   ipcMain.handle('readFileContent', readFileContent)
   ipcMain.handle('publish', BTPublish)
   ipcMain.handle('sitePublish', sitePublish)
+  ipcMain.handle('siteRSPublish', siteRSPublish)
   ipcMain.handle('setSiteUAP', setSiteUAP)
   ipcMain.handle('getSiteSrc', getSiteSrc)
+  ipcMain.handle('searchPosts', searchPosts)
   ipcMain.on('setProxyConfig', setProxyConfig)
   ipcMain.on('setUAP', setUAP)
   ipcMain.on('checkLoginStatus', checkAllLoginStatus)
@@ -1332,10 +1405,15 @@ app.whenReady().then(async () => {
   //配置axios代理
   let pconf = db.data.proxyConfig
   if (pconf.status) {
-    axios.defaults.proxy = {
-      protocol: pconf.type,
-      port: pconf.port,
-      host: pconf.host
+    if (pconf.type == "socks") {
+      axios.defaults.httpsAgent = new socksProxy.SocksProxyAgent(`socks://${pconf.host}:${pconf.port}`)
+    }
+    else{
+      axios.defaults.proxy = {
+        protocol: pconf.type,
+        port: pconf.port,
+        host: pconf.host
+      }
     }
   }
 
