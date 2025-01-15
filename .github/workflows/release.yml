@@ -1,0 +1,51 @@
+name: 构建并发布Release
+
+on: 
+    pull_request:  
+        types:
+          - closed
+        branches: 
+          - beta
+    workflow_dispatch: 
+
+jobs:
+    build:
+      if: github.event.pull_request.merged == true
+      name: 编译构建
+      runs-on: windows-latest
+
+      steps:
+        - name: 克隆代码
+          uses: actions/checkout@v4
+          with:
+            ref: ${{ github.sha }}
+
+        - name: 安装Node环境
+          uses: actions/setup-node@v4
+          with:
+            node-version: "20"
+
+        - name: 安装依赖
+          run: npm ci
+
+        - name: 读取package.json
+          uses: rexdefuror/read-package-json@v1.0.5
+
+        - name: 打包构建
+          run: |
+            npm run build:win
+            Compress-Archive -Path ./dist/win-unpacked -DestinationPath ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-win-unpacked.zip
+
+        - name: 发布Release
+          uses: softprops/action-gh-release@v2
+          with:
+            tag_name: v${{ env.PACKAGE_VERSION }}
+            name: ${{ env.PACKAGE_VERSION }}
+            draft: false
+            prerelease: true
+            body_path: NEW.md
+            files: |
+              ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe
+              ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
+              ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-win-unpacked.zip
+              ./dist/beta.yml

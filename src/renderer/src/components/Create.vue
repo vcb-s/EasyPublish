@@ -25,7 +25,7 @@
         note: string[],
         category_bangumi: string,
         category_nyaa: string,
-        tag: string[],
+        tag: {label: string, value: string}[],
         path_md: string,
         path_html: string,
         path_bbcode: string, 
@@ -538,22 +538,15 @@
                             </el-form-item>
                             <el-form-item label="Bangumi标签">
                                 <el-select
-                                    v-model="config.tag"
-                                    multiple
-                                    filterable
-                                    remote
-                                    reserve-keyword
-                                    remote-show-suffix
-                                    placeholder="请选择或添加Bangumi标签"
-                                    :remote-method="searchBangumiTags"
-                                    :loading="isSearching"
-                                    style="width: 750px"
+                                    v-model="config.tag" value-key="label" placeholder="请选择或添加Bangumi标签"
+                                    multiple filterable remote reserve-keyword remote-show-suffix
+                                    :remote-method="searchBangumiTags" :loading="isSearching" style="width: 750px"
                                 >
                                     <el-option
                                     v-for="item in BangumiTags"
-                                    :key="item.value"
+                                    :key="item.label"
                                     :label="item.label"
-                                    :value="item.value"
+                                    :value="{label: item.label, value: item.value}"
                                     />
                                 </el-select>
                             </el-form-item>

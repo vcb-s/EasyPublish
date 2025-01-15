@@ -46,7 +46,7 @@ export interface PublishConfig {
   torrentname?: string
   category_bangumi: string
   category_nyaa: string
-  tag: string[]
+  tag: {label: string, value: string}[]
   content?: Content_file | Content_text
   completed?: boolean
   information: string
