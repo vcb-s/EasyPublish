@@ -1,10 +1,10 @@
 {
   "name": "easypublish",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "description": "An Electron application with Vue and TypeScript",
   "main": "./out/main/index.js",
   "author": "Asendaushoe",
-  "homepage": "https://github.com/Asendaushoe/EasyPublish",
+  "homepage": "https://github.com/vcb-s/EasyPublish",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint . --ext .js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts,.vue --fix",

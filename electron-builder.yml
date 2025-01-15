@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: easypublish
+appId: com.easypublish.app
+productName: EasyPublish
 directories:
   buildResources: build
 files:
