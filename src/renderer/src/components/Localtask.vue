@@ -100,10 +100,10 @@
                                 </el-button>
                             </template>
                         </el-table-column>
-                        <el-table-column prop="id" label="ID" width="180" />
+                        <el-table-column prop="id" label="ID" width="140" />
                         <el-table-column prop="name" label="项目名称" show-overflow-tooltip />
                         <el-table-column prop="path" label="项目地址" show-overflow-tooltip />
-                        <el-table-column prop="status" label="状态" width="150" />
+                        <el-table-column prop="status" label="状态" width="120" />
                     </el-table>
                 </el-col>
                 <el-col :span="3" />

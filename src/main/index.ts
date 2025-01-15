@@ -227,7 +227,7 @@ async function BTPublish(_event, id: number, type: string) {
       formData.append('category_tag_id', config.category_bangumi)
       formData.append('title',  config.title)
       formData.append('introduction', html)
-      formData.append('tag_ids', config.tag.toString())
+      formData.append('tag_ids', config.tag.map(item => item.value).toString())
       formData.append('btskey', 'undefined')
       formData.append('team_id', team_id)
       formData.append('teamsync', '1')
@@ -297,7 +297,7 @@ async function BTPublish(_event, id: number, type: string) {
       formData.append('category_tag_id', config.category_bangumi)
       formData.append('title',  config.title)
       formData.append('introduction', html)
-      formData.append('tag_ids', config.tag.toString())
+      formData.append('tag_ids', config.tag.map(item => item.value).toString())
       formData.append('btskey', 'undefined')
       formData.append('team_id', team_id)
       formData.append('file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
@@ -987,11 +987,16 @@ async function readFileContent(_event) {
 //创建新任务
 async function createTask(_event, path: string, config: PublishConfig) {
   try{
+    if (path === "") {
+      path = app.getPath('userData') + '\\task'
+      if (!fs.existsSync(path))
+        fs.mkdirSync(path)
+    }
     if (!fs.existsSync(path)) {
-      return "noSuchFolder"
+      return 'noSuchFolder'
     }
     else{
-      fs.mkdirSync( path + '\\' +  config.name)
+      fs.mkdirSync(path + '\\' +  config.name)
       if (config.type == 'file') {
         const file: Content_file = {
           path_md: '',
@@ -1370,7 +1375,7 @@ function createWindow(): void {
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   //设置应用数据库
-  db = await JSONFilePreset<Data>('easypublish-db.json', defaultData)
+  db = await JSONFilePreset<Data>(app.getPath('userData') + '\\easypublish-db.json', defaultData)
   await db.write()
   //响应通信
   ipcMain.handle('openFile', handleFileOpen)
@@ -1418,7 +1423,7 @@ app.whenReady().then(async () => {
   }
 
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.easypublish')
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.
@@ -1426,9 +1431,6 @@ app.whenReady().then(async () => {
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
-
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
 
   createWindow()
 

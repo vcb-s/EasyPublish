@@ -34,7 +34,7 @@
             trigger: 'change'
         }],
         path: [{
-            required: true,
+            required: false,
             message: '请选择一个保存路径',
             trigger: 'change'
         }],
@@ -99,8 +99,8 @@
                         })
                     }, 500);
                 }
-                else if (result == 'noSuchFolder') {
-                    ElMessage.error('选择的目录无效')
+                else if (result.includes('noSuchFolder')){
+                    ElMessage.error('目录不存在')
                 }
                 else {
                     ElMessage.error(result)
