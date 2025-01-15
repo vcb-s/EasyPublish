@@ -1,5 +1,3 @@
-# 1.0.0-beta.3
-
 - 调整创建新任务时本地保存路径为非必填选项，留空默认存放于appData\Roaming\easypublish\task下
 - 优化部分UI布局
 - 修复重新编辑项目配置时，Bangumi标签显示为分类ID的问题
