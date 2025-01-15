@@ -1,0 +1,47 @@
+name: 构建并发布Release
+
+on: 
+    push: 
+        branches: 
+            - alpha
+    workflow_dispatch: 
+
+jobs:
+    build:
+        name: 编译构建
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: 克隆代码
+              uses: actions/checkout@v4
+              with:
+                ref: alpha
+
+            - name: 安装Node环境
+              uses: actions/setup-node@v4
+              with:
+                node-version: "20"
+
+            - name: 安装依赖
+              run: npm ci
+
+            - name: 打包构建
+              run: |
+                npm run build:win
+                VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "v0.0.1")
+                echo "VERSION=${VERSION}" >> $GITHUB_ENV
+                zip -r ./dist/${{ env.VERSION }}-win-unpacked.zip ./dist/win-unpacked
+
+            - name: 发布Release
+              uses: softprops/action-gh-release@v2
+              with:
+                tag_name: v${{ env.VERSION }}
+                name: ${{ env.VERSION }}
+                draft: true
+                prerelease: true
+                body_path: NEW.md
+                files: |
+                    ./dist/${{ env.VERSION }}-setup.exe
+                    ./dist/${{ env.VERSION }}-setup.exe.blockmap
+                    ./dist/${{ env.VERSION }}-win-unpacked.zip
+                    ./dist/beta.yml
