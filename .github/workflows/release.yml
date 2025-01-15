@@ -1,9 +1,9 @@
 name: 构建并发布Release
 
 on: 
-    push: 
+    pull_request:  
         branches: 
-            - alpha
+            - beta
     workflow_dispatch: 
 
 jobs:
@@ -38,7 +38,7 @@ jobs:
               with:
                 tag_name: v${{ env.PACKAGE_VERSION }}
                 name: ${{ env.PACKAGE_VERSION }}
-                draft: true
+                draft: false
                 prerelease: true
                 body_path: NEW.md
                 files: |
