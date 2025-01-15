@@ -25,23 +25,24 @@ jobs:
             - name: 安装依赖
               run: npm ci
 
+            - name: 读取package.json
+              uses: rexdefuror/read-package-json@v1.0.5
+
             - name: 打包构建
               run: |
                 npm run build:win
-                VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "v0.0.1")
-                echo "VERSION=${VERSION}" >> $GITHUB_ENV
-                zip -r ./dist/${{ env.VERSION }}-win-unpacked.zip ./dist/win-unpacked
+                zip -r ./dist/${{ env.PACKAGE_VERSION }}-win-unpacked.zip ./dist/win-unpacked
 
             - name: 发布Release
               uses: softprops/action-gh-release@v2
               with:
-                tag_name: v${{ env.VERSION }}
-                name: ${{ env.VERSION }}
+                tag_name: v${{ env.PACKAGE_VERSION }}
+                name: ${{ env.PACKAGE_VERSION }}
                 draft: true
                 prerelease: true
                 body_path: NEW.md
                 files: |
-                    ./dist/${{ env.VERSION }}-setup.exe
-                    ./dist/${{ env.VERSION }}-setup.exe.blockmap
-                    ./dist/${{ env.VERSION }}-win-unpacked.zip
+                    ./dist/${{ env.PACKAGE_VERSION }}-setup.exe
+                    ./dist/${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
+                    ./dist/${{ env.PACKAGE_VERSION }}-win-unpacked.zip
                     ./dist/beta.yml
