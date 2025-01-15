@@ -31,7 +31,7 @@ jobs:
             - name: 打包构建
               run: |
                 npm run build:win
-                Compress-Archive -Path ./dist/win-unpacked -DestinationPath ./dist/${{ env.PACKAGE_VERSION }}-win-unpacked.zip
+                Compress-Archive -Path ./dist/win-unpacked -DestinationPath ./dist/easypublish- ${{ env.PACKAGE_VERSION }}-win-unpacked.zip
 
             - name: 发布Release
               uses: softprops/action-gh-release@v2
@@ -42,7 +42,7 @@ jobs:
                 prerelease: true
                 body_path: NEW.md
                 files: |
-                    ./dist/${{ env.PACKAGE_VERSION }}-setup.exe
-                    ./dist/${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
-                    ./dist/${{ env.PACKAGE_VERSION }}-win-unpacked.zip
+                    ./dist/easypublish- ${{ env.PACKAGE_VERSION }}-setup.exe
+                    ./dist/easypublish- ${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
+                    ./dist/easypublish- ${{ env.PACKAGE_VERSION }}-win-unpacked.zip
                     ./dist/beta.yml
