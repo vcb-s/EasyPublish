@@ -18,7 +18,7 @@ jobs:
         - name: 克隆代码
           uses: actions/checkout@v4
           with:
-            ref: alpha
+            ref: beta
 
         - name: 安装Node环境
           uses: actions/setup-node@v4
