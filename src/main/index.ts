@@ -239,7 +239,12 @@ async function BTPublish(_event, id: number, type: string) {
         await sleep(1000)
         let result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
         for (let index = 0; index < 5; index++) {
-          if (result.status == 200) 
+          if (result.status == 200 && 
+            result.data.sync.acgnx && 
+            result.data.sync.acgnx_int && 
+            result.data.sync.acgrip && 
+            result.data.sync.dmhy
+          ) 
             break
           await sleep(1000)
           result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
@@ -685,10 +690,10 @@ async function createLoginWindow(type: string) {
   }
 
   const loginWindow = new BrowserWindow({
-    width: 950,
+    width: 1200,
     minWidth: 950,
     minHeight: 550,
-    height: 550,
+    height: 600,
     autoHideMenuBar: true,
     show: false,
     icon: appIcon,

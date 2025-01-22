@@ -128,6 +128,10 @@
             required: true,
             message: '请填写标题',
             trigger: 'change'
+        },{
+            max: 128, 
+            message: '长度不得超过128', 
+            trigger: 'change'
         }],
     })
     //设置位深

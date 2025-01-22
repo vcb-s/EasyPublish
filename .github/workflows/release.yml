@@ -5,7 +5,7 @@ on:
         types:
           - closed
         branches: 
-          - beta
+          - main
     workflow_dispatch: 
 
 jobs:
@@ -48,4 +48,4 @@ jobs:
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-win-unpacked.zip
-              ./dist/beta.yml
+              ./dist/latest.yml

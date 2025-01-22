@@ -99,7 +99,7 @@
     const isPublishing = ref(false)
     async function submit() {
         let result: string
-        if (isRS)
+        if (isRS.value)
             result = await window.api.SiteRSPublish(props.id, rsID.value, title.value, content.value)
         else
             result = await window.api.SitePublish(props.id ,JSON.stringify(category.value), imgsrc.value, title.value, content.value)
