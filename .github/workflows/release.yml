@@ -5,7 +5,7 @@ on:
         types:
           - closed
         branches: 
-          - beta
+          - main
     workflow_dispatch: 
 
 jobs:
@@ -42,10 +42,10 @@ jobs:
             tag_name: v${{ env.PACKAGE_VERSION }}
             name: ${{ env.PACKAGE_VERSION }}
             draft: false
-            prerelease: true
+            prerelease: false
             body_path: NEW.md
             files: |
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-win-unpacked.zip
-              ./dist/beta.yml
+              ./dist/latest.yml
