@@ -42,7 +42,7 @@ jobs:
             tag_name: v${{ env.PACKAGE_VERSION }}
             name: ${{ env.PACKAGE_VERSION }}
             draft: false
-            prerelease: true
+            prerelease: false
             body_path: NEW.md
             files: |
               ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe
