@@ -45,7 +45,7 @@ jobs:
             prerelease: false
             body_path: NEW.md
             files: |
-              ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe
-              ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-setup.exe.blockmap
-              ./dist/easypublish${{'-'}}${{ env.PACKAGE_VERSION }}-win-unpacked.zip
+              ./dist/*.exe
+              ./dist/*.blockmap
+              ./dist/*.zip
               ./dist/latest.yml

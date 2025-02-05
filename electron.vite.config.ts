@@ -8,10 +8,16 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
   main: {
-    plugins: [externalizeDepsPlugin({ exclude: ['lowdb','axios-retry'] })]
+    plugins: [externalizeDepsPlugin({ exclude: ['lowdb','axios-retry'] })],
+    build: {
+      outDir: 'app/out/main'
+    }
   },
   preload: {
-    plugins: [externalizeDepsPlugin()]
+    plugins: [externalizeDepsPlugin()],
+    build: {
+      outDir: 'app/out/preload'
+    }
   },
   renderer: {
     resolve: {
@@ -28,5 +34,8 @@ export default defineConfig({
       }),
       vue(),
       vueDevTools()
-  ]}
+    ],
+    build: {
+      outDir: 'app/out/renderer'
+    }}
 })

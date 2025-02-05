@@ -8,7 +8,7 @@
         <img src="../assets/icon.png" />
     </div>
     <br />
-    当前版本：1.0.0<br />
+    当前版本：1.0.1<br />
     项目地址：<a href="https://github.com/vcb-s/EasyPublish">https://github.com/vcb-s/EasyPublish</a><br />
     这个快速开始让我吃了，去项目页看吧。
 </div>
