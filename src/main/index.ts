@@ -249,6 +249,7 @@ async function BTPublish(_event, id: number, type: string) {
             result.data.sync.dmhy
           ){ 
             storage.sync = false
+            await db.write()
             break
           }
           await sleep(1000)
@@ -1309,8 +1310,8 @@ async function getSiteInfo(_event, id: number) {
           if (!storage.dmhy)
             storage.dmhy = '种子已存在'
         }
-        await db.write()
       }
+      await db.write()
     }
     //从文件创建
     if (config.type == 'file') {
