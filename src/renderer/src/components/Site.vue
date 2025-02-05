@@ -130,8 +130,8 @@
     async function loadData() {
         const result = await window.api.GetSiteInfo(props.id)
         publishInfo.value = result.slice(0, 6)
-        content.value = result[6]
-        title.value = result[7]
+        if (result[6] != '') content.value = result[6]
+        if (result[7] != '') title.value = result[7]
     }
 
     //右键复制事件
@@ -226,6 +226,7 @@
                     </div>
                     <el-collapse>
                         <el-collapse-item title="BT链接">
+                            <el-link :underline="false" @click="loadData()" type="primary">刷新<el-icon><Refresh /></el-icon></el-link>
                             <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
                         </el-collapse-item>
                     </el-collapse>

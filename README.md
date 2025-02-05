@@ -137,10 +137,6 @@ EasyPublish在发布之前会再次检查登录状态，若出现异常请前往
 
 右上有可以切换明暗主题的滑块。
 
-从前就听说Electron打包体积和资源占用夸张，还真是一点也不客气。
-
-有问题出BUG找Asen。
-
 *开发是业余的，框架是现学的。* 
 
 *代码是一坨的，BUG是一堆的。* 
@@ -165,10 +161,6 @@ EasyPublish在发布之前会再次检查登录状态，若出现异常请前往
 | marked       | [https://github.com/markedjs/marked](https://github.com/markedjs/marked) |
 
 ------
-
-## Recommended IDE Setup
-
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) + [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [TypeScript Vue Plugin (Volar)](https://marketplace.visualstudio.com/items?itemName=Vue.vscode-typescript-vue-plugin)
 
 ## Project Setup
 

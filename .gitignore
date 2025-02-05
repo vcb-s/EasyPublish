@@ -1,6 +1,7 @@
 node_modules
 dist
 out
+app/out
+app/node_modules
 .DS_Store
 *.log*
-easypublish-db.json

@@ -42,6 +42,7 @@ import appIcon from '../../build/icon.ico?asset'
 */
 
 //应用数据管理及异常处理错误日志打印
+app.commandLine.appendSwitch('lang', 'zh-CN');
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.234 Safari/537.36'
 log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]{scope} {text}'
 const date = new Date()
@@ -62,6 +63,7 @@ type Storage = {
   acgnx_g?: string
   acgnx_a?: string
   site?: string
+  sync: boolean
   status: 'published' | 'publishing'
   step: 'create' | 'check' | 'publish' | 'site' | 'finish'
 }
@@ -236,6 +238,7 @@ async function BTPublish(_event, id: number, type: string) {
       if (response.status != 200) throw response
       if (response.data.success === true) {
         storage.bangumi = 'https://bangumi.moe/torrent/' + response.data.torrent._id
+        storage.sync = true
         await sleep(1000)
         let result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
         for (let index = 0; index < 5; index++) {
@@ -244,11 +247,15 @@ async function BTPublish(_event, id: number, type: string) {
             result.data.sync.acgnx_int && 
             result.data.sync.acgrip && 
             result.data.sync.dmhy
-          ) 
+          ){ 
+            storage.sync = false
+            await db.write()
             break
+          }
           await sleep(1000)
           result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
         }
+        if (storage.sync) return 'success'
         if (result.data.sync.acgnx != '已存在相同的种子'){
           storage.acgnx_a = result.data.sync.acgnx
         }
@@ -1021,7 +1028,8 @@ async function createTask(_event, path: string, config: PublishConfig) {
         name: config.name,
         path: path + '\\' + config.name,
         status: 'publishing',
-        step: 'create'
+        step: 'create',
+        sync: false
       })
       await db.write()
       return 'success:' + id
@@ -1251,6 +1259,60 @@ async function getSiteInfo(_event, id: number) {
     storage.step = 'site'
     await db.write()
     let result: string[] = []
+    //若bangumi团队同步未完成则再次尝试获取各站链接
+    if (storage.sync && 
+      !storage.acgrip && 
+      !storage.dmhy && 
+      !storage.acgnx_g && 
+      !storage.acgnx_a
+    ){
+      let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
+      for (let index = 0; index < 5; index++) {
+        if (response.status == 200 && 
+          response.data.sync.acgnx && 
+          response.data.sync.acgnx_int && 
+          response.data.sync.acgrip && 
+          response.data.sync.dmhy
+        ){ 
+          storage.sync = false
+          break
+        }
+        await sleep(1000)
+        response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
+      }
+      if (storage.sync) 
+      {
+        if (response.data.sync.acgnx != '已存在相同的种子'){
+          storage.acgnx_a = response.data.sync.acgnx
+        }
+        else{
+          if (!storage.acgnx_a)
+            storage.acgnx_a = '种子已存在'
+        }
+        if (response.data.sync.acgnx_int != '已存在相同的种子'){
+          storage.acgnx_g = response.data.sync.acgnx_int
+        }
+        else{
+          if (!storage.acgnx_g)
+            storage.acgnx_g = '种子已存在'
+        }
+        if (response.data.sync.acgrip != '已存在相同的种子'){
+          storage.acgrip = response.data.sync.acgrip
+        }
+        else{
+          if (!storage.acgrip)
+            storage.acgrip = '种子已存在'
+        }
+        if (response.data.sync.dmhy != '已存在相同的种子'){
+          storage.dmhy = response.data.sync.dmhy
+        }
+        else{
+          if (!storage.dmhy)
+            storage.dmhy = '种子已存在'
+        }
+      }
+      await db.write()
+    }
     //从文件创建
     if (config.type == 'file') {
       result.push('萌番组：' + (storage.bangumi ? storage.bangumi : ''))
