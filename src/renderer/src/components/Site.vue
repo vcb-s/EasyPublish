@@ -23,6 +23,7 @@
         id: number
         title: string
         content: string
+        raw: string
     }
     const isRS = ref<boolean>(false)
     const rstitle = ref<string>('')
@@ -33,6 +34,10 @@
     const title = ref<string>('')
     const imgsrc = ref<string>('')
     const category = ref<number[]>([])
+    const credit_name = ref('')
+    const credit_link = ref('')
+    const mediaInfo = ref('')
+    const oldLinks = ref('')
     const options = [
         {
             label: '1080p Full HD',
@@ -56,6 +61,20 @@
         },
     ]
 
+    //添加Credit信息
+    function addCredit() {
+        let credit = `Image Credit: <a href="${credit_link.value}" rel="noopener" target="_blank">${credit_name.value}</a>\n\n<label`
+        content.value = content.value.replace('<label', credit)
+    }
+    //添加MediaInfo
+    function addMediaInfo() {
+        content.value = content.value.replace('请将MediaInfo放置于此', mediaInfo.value)
+    }
+    //添加旧链
+    function addLinks() {
+        content.value = content.value.replace('请将旧链放于此', oldLinks.value)
+    }
+
     //RS搜索文章
     async function searchPosts() {
         const result = await window.api.SearchPosts(rstitle.value)
@@ -64,7 +83,28 @@
 
     //RS选择文章
     function handleCurrentChange(val: Tabledata | undefined) {
-        rsID.value = val ? val.id : 0
+        if (val) {
+            rsID.value = val.id
+            let raw = tableData.value.find(item => item.id == rsID.value)!.raw
+            mediaInfo.value = raw.match(/<pre[\s\S]*?>[\s]*([\s\S]*?)\s<\/pre>/)![1];
+            let credit = raw.match(/Image\sCredit[\s\S]*?href="([\s\S]*?)"[\s\S]*?>([\s\S]*?)<\/a>/)
+            if (credit)
+                [,credit_link.value,credit_name.value] = credit
+            let links = raw.match(/\[box\sstyle="download"\][\s\S]*?\[\/box\]/g)
+            oldLinks.value = ''
+            if (links) {
+                links.forEach((_item, index) => {
+                    links[index] = links[index].replace(/(\s)(<a[\s\S]*?<\/a>)(\s)/g, '$1<del>$2</del>$3')
+                    oldLinks.value += links[index]
+                    if (index < links.length - 1)
+                        oldLinks.value += '\n\n'
+                });
+                
+            }
+        }
+        else {
+            rsID.value = 0
+        }
     }
 
     //上传文件
@@ -130,8 +170,8 @@
     async function loadData() {
         const result = await window.api.GetSiteInfo(props.id)
         publishInfo.value = result.slice(0, 6)
-        if (result[6] != '') content.value = result[6]
-        if (result[7] != '') title.value = result[7]
+        if (result[6] != '') title.value = result[6]
+        if (result[7] != '') content.value = result[7]
     }
 
     //右键复制事件
@@ -167,29 +207,6 @@
                             <el-form-item label="标题">
                                 <el-input v-model="title" placeholder="请填写标题"/>
                             </el-form-item>
-                            <el-form-item label="主站发布图">
-                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imgsrc">
-                                    <template #append>
-                                        <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
-                                            <el-icon><FolderOpened /></el-icon>
-                                        </el-button>
-                                    </template>
-                                </el-input>
-                            </el-form-item>
-                            <el-form-item label="分类">
-                                <el-select
-                                    v-model="category"
-                                    multiple
-                                    placeholder="选择类别"
-                                    style="width: 250px"
-                                >
-                                    <el-option
-                                        v-for="item in options"
-                                        :label="item.label"
-                                        :value="item.value"
-                                    />
-                                </el-select>
-                            </el-form-item>
                             <el-form-item label="RS选项">
                                 <el-checkbox v-model="isRS" label="RS覆盖原帖" />
                             </el-form-item>
@@ -200,7 +217,7 @@
                                     </template>
                                 </el-input>
                                 <el-table :data="tableData" highlight-current-row
-                                @current-change="handleCurrentChange">
+                                @current-change="handleCurrentChange" style="margin-top: 10px;">
                                     <el-table-column prop="id" label="ID" width="70" />
                                     <el-table-column label="文章标题">
                                         <template #default="scope">
@@ -222,12 +239,75 @@
                                     </el-table-column>
                                 </el-table>
                             </el-form-item>
+                            <el-form-item v-if="!isRS" label="主站发布图">
+                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imgsrc">
+                                    <template #append>
+                                        <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
+                                            <el-icon><FolderOpened /></el-icon>
+                                        </el-button>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                            <el-form-item v-if="!isRS" label="分类">
+                                <el-select
+                                    v-model="category"
+                                    multiple
+                                    placeholder="选择类别"
+                                    style="width: 250px"
+                                >
+                                    <el-option
+                                        v-for="item in options"
+                                        :label="item.label"
+                                        :value="item.value"
+                                    />
+                                </el-select>
+                            </el-form-item>
                         </el-form>
                     </div>
                     <el-collapse>
                         <el-collapse-item title="BT链接">
                             <el-link :underline="false" @click="loadData()" type="primary">刷新<el-icon><Refresh /></el-icon></el-link>
                             <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
+                        </el-collapse-item>
+                        <el-collapse-item title="填写模板">
+                            <h3>Credit信息：</h3>
+                            <div>
+                                <span>
+                                    <span>署名：</span>
+                                    <span>
+                                        <el-input style="width: 120px;" v-model="credit_name" />
+                                    </span>
+                                </span>
+                                <span>
+                                    <span style="margin-left: 20px;">链接：</span>
+                                    <span>
+                                        <el-input style="width: 320px;" v-model="credit_link" />
+                                    </span>
+                                </span>
+                                <span>
+                                    <el-button style="margin-left: 20px;" @click="addCredit()">添加Credit信息</el-button>
+                                </span>
+                            </div>
+                            <h3>MediaInfo:</h3>
+                            <div>
+                                <el-input
+                                    v-model="mediaInfo"
+                                    :autosize="{minRows:20}"
+                                    type="textarea"
+                                    placeholder="请填写MediaInfo"
+                                />
+                                <el-button style="margin-top: 20px;" @click="addMediaInfo()">添加MediaInfo</el-button>
+                            </div>
+                            <h3 v-if="isRS">RS旧链：</h3>
+                            <div v-if="isRS">
+                                <el-input
+                                    v-model="oldLinks"
+                                    :autosize="{minRows:10}"
+                                    type="textarea"
+                                    placeholder="请填写旧链"
+                                />
+                                <el-button style="margin-top: 20px;" @click="addLinks()">添加旧链</el-button>
+                            </div>
                         </el-collapse-item>
                     </el-collapse>
                     <el-row style="height: 20px;" />

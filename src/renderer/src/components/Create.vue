@@ -1,14 +1,28 @@
 <script setup lang="ts" name="Create">
     import { defineProps, onMounted, ref, reactive, computed } from "vue"
-    import type { PublishConfig } from '../index.d.ts'
+    import type { PublishConfig, Content_text } from '../index.d.ts'
     import { useRouter } from 'vue-router'
-    import type { FormInstance, FormRules } from 'element-plus'
+    import type { FormRules } from 'element-plus'
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
 
+    //设置参与制作者表单验证
+    const checkMembers = (_rules, _value, callback) => {
+        if (config.script != '' &&
+        config.encode != '' &&
+        config.collate != '' &&
+        config.upload != ''
+        ) {
+            callback()
+        }
+        else
+            callback(new Error('请填写参与制作者'))
+    }
     //设置表单
     const createForm_file = ref()
+    const createForm_text = ref()
+    const url_type = ref('html')
     const type = ref(true)
     interface ruleForm {
         type: string,
@@ -17,14 +31,36 @@
         Name_Ch: string,
         Name_En: string,
         Name_Jp: string,
+        comment_Ch: string
+        comment_En: string
+        rs_comment_Ch: string
+        rs_comment_En: string
         information: string,
         bit: string,
         resolution: string,
         encoding: string,
         torrent_type: string,
+        pictures_md: string
+        pictures_bbcode: string
+        pictures_html: string
+        nomination: boolean
+        reseed: boolean
+        nonsense: string
         note: string[],
+        sub_Ch: string
+        sub_En: string
+        audio_Ch: string
+        audio_En: string
+        subTeam_Ch: string[]
+        subTeam_En: string[]
         category_bangumi: string,
         category_nyaa: string,
+        providers: string
+        picture_path: string
+        script: string
+        encode: string
+        collate: string
+        upload: string
         tag: {label: string, value: string}[],
         path_md: string,
         path_html: string,
@@ -42,8 +78,17 @@
         Name_Jp: "",
         information: '',
         bit: "",
+        picture_path: '',
+        nomination: false,
+        reseed: false,
         resolution: "",
         encoding: "",
+        comment_Ch: '',
+        comment_En: '',
+        script: '',
+        encode: '',
+        collate: '',
+        upload: '',
         torrent_type: "",
         note: [],
         category_bangumi: "",
@@ -53,15 +98,26 @@
         path_html: '',
         path_bbcode: '',
         title: '',
+        rs_comment_Ch: "",
+        rs_comment_En: "",
+        pictures_md: "",
+        pictures_bbcode: "",
+        pictures_html: "",
+        nonsense: "",
+        sub_Ch: "",
+        sub_En: "",
+        audio_Ch: "",
+        audio_En: "",
+        subTeam_Ch: [],
+        subTeam_En: [],
+        providers: ""
     })
     const rules = reactive<FormRules<ruleForm>>({
         Name_Ch: [{
-            required: true,
             message: '请输入中文标题',
             trigger: 'change'
         }],
         Name_Jp: [{
-            required: true,
             message: '请输入日语标题',
             trigger: 'change'
         }],
@@ -85,6 +141,16 @@
             message: '请输选择成片编码格式',
             trigger: 'change'
         }],
+        comment_Ch: [{
+            required: true,
+            message: '请填写总监吐槽',
+            trigger: 'change'
+        }],
+        comment_En: [{
+            required: true,
+            message: '请填写总监吐槽',
+            trigger: 'change'
+        }],
         torrent_type: [{
             required: true,
             message: '请选择成片类型',
@@ -100,13 +166,22 @@
             message: '请设置Nyaa分类',
             trigger: 'change'
         }],
+        picture_path: [{
+            required: true,
+            message: '选择海报图',
+            trigger: 'change'
+        }],
         information: [{
             required: false,
             message: '请填写Nyaa Information，默认https://vcb-s.com/archives/138',
             trigger: 'change'
         }],
-        path_md: [{
+        script: [{
             required: true,
+            validator: checkMembers,
+            trigger: 'blur'
+        }],
+        path_md: [{
             message: '请选择Nyaa描述文件',
             trigger: 'change'
         }],
@@ -170,11 +245,15 @@
         {
             label: '720p',
             value: '720p'
+        },
+        {
+            label: '2160p',
+            value: '2160p'
         }
     ])
     const isAddingResolutionOption = ref(false)
     const newResolutionOption = ref('')
-    const onAddResolutionOption = () => {    isAddingBitOption.value = true    }
+    const onAddResolutionOption = () => {    isAddingResolutionOption.value = true    }
     const onConfirmResolutionOption = () => {
     if (newBitOption.value) {
         bitOptions.value.push({
@@ -185,8 +264,268 @@
     }
     }
     const clearResolutionOption = () => {
-        newBitOption.value = ''
-        isAddingBitOption.value = false
+        newResolutionOption.value = ''
+        isAddingResolutionOption.value = false
+    }
+    //设置编码
+    const encodingOptions = ref([
+        {
+            label: 'AVC',
+            value: 'AVC'
+        },
+        {
+            label: 'HEVC',
+            value: 'HEVC'
+        },
+        {
+            label: 'AVC/HEVC',
+            value: 'AVC/HEVC'
+        }
+    ])
+    const isAddingEncodingOption = ref(false)
+    const newEncodingOption = ref('')
+    const onAddEncodingOption = () => {    isAddingEncodingOption.value = true    }
+    const onConfirmEncodingOption = () => {
+        if (newEncodingOption.value) {
+            encodingOptions.value.push({
+            label: newEncodingOption.value,
+            value: newEncodingOption.value,
+            })
+            clearEncodingOption()
+        }
+    }
+    const clearEncodingOption = () => {
+        newEncodingOption.value = ''
+        isAddingEncodingOption.value = false
+    }
+    //设置类型
+    const typeOptions = ref([
+        {
+            label: 'BDRip',
+            value: 'BDRip'
+        },
+        {
+            label: 'DVDRip',
+            value: 'DVDRip'
+        }
+    ])
+    const isAddingTypeOption = ref(false)
+    const newTypeOption = ref('')
+    const onAddTypeOption = () => {    isAddingTypeOption.value = true    }
+    const onConfirmTypeOption = () => {
+        if (newTypeOption.value) {
+            typeOptions.value.push({
+            label: newTypeOption.value,
+            value: newTypeOption.value,
+            })
+            clearTypeOption()
+        }
+    }
+    const clearTypeOption = () => {
+        newTypeOption.value = ''
+        isAddingTypeOption.value = false
+    }
+    //设置内容量
+    const noteOptions = ref([
+        {
+            label: 'S1',
+            value: 'S1'
+        },
+        {
+            label: 'S2',
+            value: 'S2'
+        },
+        {
+            label: 'S1-S3',
+            value: 'S1-S3'
+        },
+        {
+            label: 'OVA',
+            value: 'OVA'
+        },
+        {
+            label: 'OVAs',
+            value: 'OVAs'
+        },
+        {
+            label: 'MOVIE',
+            value: 'MOVIE'
+        },
+        {
+            label: 'LIVE',
+            value: 'LIVE'
+        }
+    ])
+    //设置字幕信息
+    const subOptions = ref([
+        {
+            label: 'ENG',
+            value: 'ENG'
+        },
+        {
+            label: 'JPN',
+            value: 'JPN'
+        }
+    ])
+    const subInfo = ref<string[]>([])
+    const subText = ref<string>('')
+    function onChangeSubInfo() {
+        let sub = ''
+        subInfo.value.forEach(item => {
+            sub += item + ' + '
+        })
+        if (subInfo.value.length > 0){
+            sub = sub.slice(0, -3)
+            subText.value = '内封原盘 ' + sub + ' 字幕。\nEmbedded official ' + sub + ' PGS.'
+        }
+        else
+            subText.value = ''
+        onChangeSubText()
+    }
+    function onChangeSubText() {
+        if (subText.value != '') {
+            let value = subText.value.split('\n')
+            config.sub_Ch = value[0]
+            config.sub_En = value[1]
+        }
+        else {
+            config.sub_Ch = ''
+            config.sub_En = ''
+        }
+    }
+    //设置音轨信息
+    const audioOptions = ref([
+        {
+            label: '部分剧集内封评论音轨',
+            value: 1
+        },
+        {
+            label: '内封评论音轨',
+            value: 2
+        },
+        {
+            label: '外挂 FLAC 5.1',
+            value: 3
+        },
+        {
+            label: '外挂 Headphone X',
+            value: 4
+        }
+    ])
+    const audioInfo = ref<number[]>([])
+    const audioText = ref<string>('')
+    function onChangeAudioInfo() {
+        let audio_in_E = ''
+        let audio_in_C = ''
+        let audio_out = ''
+        audioInfo.value.forEach(item => {
+            if (item == 1) {
+                audio_in_C = '部分剧集内封评论音轨。'
+                audio_in_E = 'Certain episodes contain commentary tracks. '
+            }
+            if (item == 2) {
+                audio_in_C = '内封评论音轨。'
+                audio_in_E = 'Embedded commentary track. '
+            }
+            if (item == 3) {
+                audio_out += 'FLAC 5.1' + ' + '
+            }
+            if (item == 4) {
+                audio_out += 'Headphone X' + ' + '
+            }
+        })
+        if (audio_out != ''){
+            audio_out = audio_out.slice(0, -3)
+            audioText.value = `${audio_in_C}外挂 ${audio_out} 。\n${audio_in_E}MKA contains ${audio_out}.`
+        }
+        else
+            audioText.value = `${audio_in_C}\n${audio_in_E}`
+        onChangeAudioText()
+    }
+    function onChangeAudioText() {
+        if (audioText.value != '') {
+            let value = audioText.value.split('\n')
+            config.audio_Ch = value[0]
+            config.audio_En = value[1]
+        }
+        else {
+            config.audio_Ch = ''
+            config.audio_En = ''
+        }
+    }
+    //设置字幕组
+    const subTeamOptions = ref([
+        {
+            label: '千夏字幕组/Airota',
+            value: '千夏字幕组/Airota'
+        },
+        {
+            label: '喵萌奶茶屋/Nekomoe kissaten',
+            value: '喵萌奶茶屋/Nekomoe kissaten'
+        },
+        {
+            label: '悠哈璃羽字幕社/UHA-WINGS',
+            value: '悠哈璃羽字幕社/UHA-WINGS'
+        },
+        {
+            label: '诸神字幕组/Kamigami',
+            value: '诸神字幕组/Kamigami'
+        },
+        {
+            label: '天香字幕社/T.H.X',
+            value: '天香字幕社/T.H.X'
+        },
+        {
+            label: '动漫国字幕组/DMG',
+            value: '动漫国字幕组/DMG'
+        },
+        {
+            label: '星空字幕组/XKsub',
+            value: '星空字幕组/XKsub'
+        },
+        {
+            label: '茉语星梦/MakariHoshiyume',
+            value: '茉语星梦/MakariHoshiyume'
+        },
+        {
+            label: '风之圣殿/FZSD',
+            value: '风之圣殿/FZSD'
+        },
+        {
+            label: '白恋字幕组/Shirokoi',
+            value: '白恋字幕组/Shirokoi'
+        },
+        {
+            label: 'SweetSub/SweetSub',
+            value: 'SweetSub/SweetSub'
+        },
+        {
+            label: 'LoliHouse/LoliHouse',
+            value: 'LoliHouse/LoliHouse'
+        },
+        {
+            label: '豌豆字幕组/BeanSub',
+            value: '豌豆字幕组/BeanSub'
+        },
+        {
+            label: '澄空学园/SumiSora',
+            value: '澄空学园/SumiSora'
+        },
+        {
+            label: '北宇治字幕组/KitaujiSub',
+            value: '北宇治字幕组/KitaujiSub'
+        }
+    ])
+    const subTeamInfo = ref<string[]>([])
+    function onChangeSubTeam() {
+        config.subTeam_Ch = []
+        config.subTeam_En = []
+        subTeamInfo.value.forEach(item => {
+            let value = item.split('/')
+            config.subTeam_Ch!.push(value[0])
+            config.subTeam_En!.push(value[1])
+        })
+        getBangumiTags()
     }
     //设置Bangumi分类
     const BangumiOptions = [
@@ -235,6 +574,7 @@
         },
     ]
     //设置Bangumi标签
+    const remoteSearchEnable = ref(true)
     const isSearching = ref(false)
     let suggestedBangumiTags =  ref<{label:string, value:string}[]>([])
     let inputBangumiTags= ref<{label:string, value:string}[]>([])
@@ -242,7 +582,10 @@
         return inputBangumiTags.value.concat(suggestedBangumiTags.value)
     })
     async function getBangumiTags() {
-        const {data, status} = await window.api.GetBangumiTags(config.title)
+        if (!remoteSearchEnable.value) 
+            return
+        let title = generateConfig().title
+        const {data, status} = await window.api.GetBangumiTags(type ? config.title : title)
         if (status == 200) {
             suggestedBangumiTags.value = []
             for (const item of data) {
@@ -257,6 +600,8 @@
         }
     }
     const searchBangumiTags = async (query: string) =>{
+        if (!remoteSearchEnable.value) 
+            return
         const {data, status} = await window.api.SearchBangumiTags(query)
         if (status == 200) {
             inputBangumiTags.value = []
@@ -286,31 +631,113 @@
         isLoading.value = false
     }
 
-    //从文件创建
+    //生成发布配置
+    function generateConfig() {
+        if (type.value) {
+            let publishConfig: PublishConfig = {
+                type: 'file',
+                name: '',
+                torrent: config.torrent,
+                information: config.information,
+                category_bangumi: config.category_bangumi,
+                category_nyaa: config.category_nyaa,
+                tag: config.tag,
+                completed: config.completed,
+                remake: config.remake,
+                title: config.title,
+                content: {
+                    path_md: config.path_md,
+                    path_html: config.path_html,
+                    path_bbcode: config.path_bbcode,
+                }
+            }
+            return publishConfig
+        }
+        else {
+            let team = '', note = ''
+            if (config.subTeam_Ch)
+                config.subTeam_Ch.forEach(item => { team += item + '&' })
+            team += 'VCB-Studio'
+            if (config.note)
+                config.note.forEach(item => { note += item + ' + ' })
+            if (note != '')
+                note = note.slice(0, -2)
+            if (config.reseed)
+                note += 'Reseed Fin'
+            else
+                note += 'Fin'
+            let title = `[${team}] `
+            if (config.Name_Ch != '') 
+                title += config.Name_Ch + ' / '
+            title += config.Name_En + ' '
+            if (config.Name_Jp != '') 
+                title += '/ ' + config.Name_Jp + ' '
+            title += `${config.bit} ${config.resolution} ${config.encoding} ${config.torrent_type} [${note}]` 
+            if (title.length > 128)
+                title = `[${team}] ${config.Name_Ch == '' ? '' : config.Name_Ch + ' / '}${config.Name_En} ${config.bit}` 
+                      + ` ${config.resolution} ${config.encoding} ${config.torrent_type} [${note}]`
+            if (title.length > 128)
+                title = `[${team}] ${config.Name_En} ${config.bit} ${config.resolution} ` 
+                      + `${config.encoding} ${config.torrent_type} [${note}]`
+            let publishConfig: PublishConfig = {
+                type: 'text',
+                name: '',
+                torrent: config.torrent,
+                information: config.information,
+                category_bangumi: config.category_bangumi,
+                category_nyaa: config.category_nyaa,
+                tag: config.tag,
+                completed: config.completed,
+                remake: config.remake,
+                title: title,
+                content: {
+                    Name_Ch: config.Name_Ch,
+                    Name_En: config.Name_En,
+                    Name_Jp: config.Name_Jp,
+                    bit: config.bit,
+                    resolution: config.resolution,
+                    encoding: config.encoding,
+                    torrent_type: config.torrent_type,
+                    reseed: config.reseed,
+                    nomination: config.nomination,
+                    note: config.note,
+                    sub_Ch: config.sub_Ch,
+                    sub_En: config.sub_En,
+                    audio_Ch: config.audio_Ch,
+                    audio_En: config.audio_En,
+                    comment_Ch: config.comment_Ch,
+                    comment_En: config.comment_En,
+                    rs_comment_Ch: config.rs_comment_Ch,
+                    rs_comment_En: config.rs_comment_En,
+                    subTeam_Ch: config.subTeam_Ch,
+                    subTeam_En: config.subTeam_En,
+                    nonsense: config.nonsense,
+                    members: {
+                        script: config.script,
+                        encode: config.encode,
+                        collate: config.collate,
+                        upload: config.upload
+                    },
+                    providers: config.providers,
+                    pictures_html: config.pictures_html,
+                    pictures_md: config.pictures_md,
+                    pictures_bbcode: config.pictures_bbcode,
+                    picture_path: config.picture_path
+                }
+            }
+            return publishConfig
+        }
+    }
+
+    //创建
     const isCreating = ref(false)
-    async function createWithFile(formEl : FormInstance | undefined ) {
+    async function createWithFile() {
+        let formEl = createForm_file.value
         if (!formEl) return
         isCreating.value = true
         await formEl.validate(async (valid, _fields) => {
             if (valid) {
-                let publishConfig: PublishConfig = {
-                    type: 'file',
-                    name: '',
-                    torrent: config.torrent,
-                    information: config.information,
-                    category_bangumi: config.category_bangumi,
-                    category_nyaa: config.category_nyaa,
-                    tag: config.tag,
-                    completed: config.completed,
-                    remake: config.remake,
-                    title: config.title,
-                    content: {
-                        path_md: config.path_md,
-                        path_html: config.path_html,
-                        path_bbcode: config.path_bbcode,
-                        path_site: '',
-                    }
-                }
+                let publishConfig: PublishConfig = generateConfig()
                 let result = await window.api.CreateWithFile(props.id, JSON.stringify(publishConfig))
                 if (result.includes("success")) {
                     ElMessage({
@@ -330,10 +757,13 @@
                 } 
                 else if (result == "noSuchFile_html") {
                     ElMessage.error("未找到html文件")
-                }
-                else if (result == "noSuchFile_md") {
-                    ElMessage.error("未找到md文件")
                 } 
+                else if (result == "noSuchFile_bbcode") {
+                    ElMessage.error("未找到bbcode文件")
+                }
+                else if (result == "noSuchFile_torrent") {
+                    ElMessage.error("未找到种子文件")
+                }
                 else if (result == "taskNotFound") {
                     ElMessage.error("未找到任务")
                 }
@@ -346,30 +776,48 @@
         })
         isCreating.value = false
     }
+    async function createWithText() {
+        let formEl = createForm_text.value
+        if (!formEl) return
+        isCreating.value = true
+        await formEl.validate(async (valid, _fields) => {
+            if (valid) {
+                let publishConfig: PublishConfig = generateConfig()
+                let result = await window.api.CreateWithText(props.id, JSON.stringify(publishConfig))
+                if (result.includes("success")) {
+                    ElMessage({
+                        message: '创建成功，即将跳转',
+                        type: 'success',
+                        plain: true,
+                    })
+                    setTimeout(() => {
+                        router.push({
+                            name: 'check',
+                            params: { id: props.id }
+                        })
+                    }, 500);
+                } 
+                else if (result == "taskNotFound") {
+                    ElMessage.error("未找到任务")
+                }
+                else if (result == "noSuchFile_torrent") {
+                    ElMessage.error("未找到种子文件")
+                }
+                else {
+                    ElMessage.error(result)
+                }
+            }else {
+                ElMessage.error('请正确填写任务配置')
+            }
+        })
+    }
 
-    //从文件保存
+    //保存
     const isSaving = ref(false)
     async function saveWithFile() {
         isSaving.value = true
-        let publishConfig: PublishConfig = {
-            type: 'file',
-            name: '',
-            torrent: config.torrent,
-            information: config.information,
-            category_bangumi: config.category_bangumi,
-            category_nyaa: config.category_nyaa,
-            tag: config.tag,
-            completed: config.completed,
-            remake: config.remake,
-            title: config.title,
-            content: {
-                path_md: config.path_md,
-                path_html: config.path_html,
-                path_bbcode: config.path_bbcode,
-                path_site: '',
-            }
-        }
-        let result = await window.api.SaveWithFile(props.id, JSON.stringify(publishConfig))
+        let publishConfig: PublishConfig = generateConfig()
+        let result = await window.api.SaveContent(props.id, JSON.stringify(publishConfig))
         if (result.includes("success")) {
             ElMessage({
                 message: '保存成功',
@@ -385,6 +833,33 @@
         }
         isSaving.value = false
     }
+    async function saveWithText() {
+        isSaving.value = true
+        let publishConfig: PublishConfig = generateConfig()
+        let result = await window.api.SaveContent(props.id, JSON.stringify(publishConfig))
+        if (result.includes("success")) {
+            ElMessage({
+                message: '保存成功',
+                type: 'success',
+                plain: true,
+            })
+        } 
+        else if (result == 'taskNotFound') {
+            ElMessage.error('未找到任务')
+        }
+        else {
+            ElMessage.error(result)
+        }
+        isSaving.value = false
+    }
+
+    //从url.txt加载对比图
+    async function loadFromTxt() {
+        let result = await window.api.LoadFromTxt()
+        config.pictures_html = result[0]
+        config.pictures_md = result[1]
+        config.pictures_bbcode = result[2]
+    }
     
     //设置滚动条区域高度
     const slbHeight = ref('')
@@ -396,6 +871,20 @@
     function setscrollbar() {
         setHeight()
         window.onresize = setHeight
+    }
+
+    //保存和创建
+    async function save() {
+        if (type.value)
+            saveWithFile()
+        else 
+            saveWithText()
+    }
+    async function create() {
+        if (type.value)
+            createWithFile()
+        else
+            createWithText()
     }
 
     //获取任务信息
@@ -410,7 +899,17 @@
         }else{
             Object.assign(config, result.config, result.config!.content)
             type.value = result.config!.type == 'file'
-            if (config.information === '') config.information = 'https://vcb-s.com/archives/138'
+            if (!type.value) {
+                Object.assign(config, (result.config!.content as Content_text).members)
+                if (config.sub_Ch != '' && config.sub_En != '')
+                    subText.value = `${config.sub_Ch}\n${config.sub_En}`
+                if (config.audio_Ch != '' && config.audio_En != '')
+                    audioText.value = `${config.audio_Ch}\n${config.audio_En}`
+                if (config.subTeam_Ch && config.subTeam_En){
+                    for (let i = 0; i < config.subTeam_Ch.length; i++)
+                        subTeamInfo.value.push(`${config.subTeam_Ch[i]}/${config.subTeam_En[i]}`)
+                }
+            }
         }
     }
 
@@ -424,7 +923,6 @@
 <template>
     <div :style="{height: slbHeight}">
         <el-scrollbar style="height: 100%;">
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row style="font-size: xx-large; height: 43px;">
                 <el-col :span="3" />
@@ -433,25 +931,42 @@
                 </el-col>
                 <el-col :span="3" />
             </el-row>
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row justify="space-between">
                 <el-col :span="3" />
                 <el-col :span="18">
                     <div v-if="!type">
                         <!-- 从模板创建 -->
-                        <el-form ref="createForm_text" :model="config" label-width="auto" style="max-width: 600px;" :rules="rules">
+                        <el-form ref="createForm_text" :model="config" label-width="auto" style="max-width: 1050px;" :rules="rules">
                             <el-form-item label="中文标题" prop="Name_Ch">
-                                <el-input v-model="config.Name_Ch" placeholder="请填写中文标题" />
+                                <el-input v-model="config.Name_Ch" placeholder="请填写中文标题" @blur="getBangumiTags()" />
                             </el-form-item>
                             <el-form-item label="英文标题" prop="Name_En">
-                                <el-input v-model="config.Name_En" placeholder="请填写英文标题" />
+                                <el-input v-model="config.Name_En" placeholder="请填写英文标题" @blur="getBangumiTags()" />
                             </el-form-item>
                             <el-form-item label="日语标题" prop="Name_Jp">
-                                <el-input v-model="config.Name_Jp" placeholder="请填写日语标题" />
+                                <el-input v-model="config.Name_Jp" placeholder="请填写日语标题" @blur="getBangumiTags()" />
+                            </el-form-item>
+                            <el-form-item label="海报图链接" prop="picture_path">
+                                <el-input placeholder="请填写海报图链接" v-model="config.picture_path">
+                                </el-input>
+                            </el-form-item>
+                            <el-form-item label="内容量">
+                                <el-select
+                                    v-model="config.note" placeholder="请填写内容量，无需标注可留空"
+                                    multiple filterable allow-create default-first-option
+                                    :reserve-keyword="false" style="width: 600px"
+                                    >
+                                    <el-option
+                                        v-for="item in noteOptions"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value"
+                                        />
+                                </el-select>
                             </el-form-item>
                             <el-form-item label="位深" prop="bit">
-                                <el-select v-model="config.bit" placeholder="请填写位深" style="width: 240px">
+                                <el-select v-model="config.bit" placeholder="请填写位深" style="width: 150px" @change="getBangumiTags()">
                                     <el-option
                                     v-for="item in bitOptions"
                                     :key="item.value"
@@ -474,7 +989,7 @@
                                 </el-select>
                             </el-form-item>
                             <el-form-item label="分辨率" prop="resolution">
-                                <el-select v-model="config.resolution" placeholder="请填写分辨率" style="width: 240px">
+                                <el-select v-model="config.resolution" placeholder="请填写分辨率" style="width: 150px" @change="getBangumiTags()">
                                     <el-option
                                     v-for="item in resolutionOptions"
                                     :key="item.value"
@@ -496,6 +1011,224 @@
                                     </template>
                                 </el-select>
                             </el-form-item>
+                            <el-form-item label="编码" prop="encoding">
+                                <el-select v-model="config.encoding" placeholder="请填写编码" style="width: 150px" @change="getBangumiTags()">
+                                    <el-option
+                                    v-for="item in encodingOptions"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                    />
+                                    <template #footer>
+                                        <el-button v-if="!isAddingEncodingOption" text bg size="small" @click="onAddEncodingOption">添加</el-button>
+                                        <template v-else>
+                                            <el-input
+                                            v-model="newEncodingOption"
+                                            class="option-input"
+                                            placeholder="添加编码选项"
+                                            size="small"
+                                            />
+                                            <el-button type="primary" size="small" @click="onConfirmEncodingOption">确认</el-button>
+                                            <el-button size="small" @click="clearEncodingOption">取消</el-button>
+                                        </template>
+                                    </template>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="类型" prop="torrent_type">
+                                <el-select v-model="config.torrent_type" placeholder="请填写类型" style="width: 150px" @change="getBangumiTags()">
+                                    <el-option
+                                    v-for="item in typeOptions"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value"
+                                    />
+                                    <template #footer>
+                                        <el-button v-if="!isAddingTypeOption" text bg size="small" @click="onAddTypeOption">添加</el-button>
+                                        <template v-else>
+                                            <el-input
+                                            v-model="newTypeOption"
+                                            class="option-input"
+                                            placeholder="添加类型选项"
+                                            size="small"
+                                            />
+                                            <el-button type="primary" size="small" @click="onConfirmTypeOption">确认</el-button>
+                                            <el-button size="small" @click="clearTypeOption">取消</el-button>
+                                        </template>
+                                    </template>
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="提名情况">
+                                <el-checkbox label="组员提名项目" v-model="config.nomination" border />
+                            </el-form-item>
+                            <el-form-item label="字幕信息">
+                                <el-select
+                                    v-model="subInfo" placeholder="请选择内封字幕信息，没有可留空"
+                                    multiple filterable allow-create default-first-option
+                                    :reserve-keyword="false" style="width: 600px"
+                                    @change="onChangeSubInfo"
+                                    >
+                                    <el-option
+                                        v-for="item in subOptions"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value"
+                                        />
+                                </el-select>
+                                <el-input v-model="subText" :rows="2" type="textarea" style="width: 600px; margin-top: 10px;" 
+                                @blur="onChangeSubText" placeholder="无" resize="none"/>
+                            </el-form-item>
+                            <el-form-item label="音轨信息">
+                                <el-select
+                                    v-model="audioInfo" placeholder="请选择内封和外挂音轨信息，没有可留空"
+                                    multiple filterable default-first-option
+                                    :reserve-keyword="false" style="width: 600px"
+                                    @change="onChangeAudioInfo"
+                                    >
+                                    <el-option
+                                        v-for="item in audioOptions"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value"
+                                        />
+                                </el-select>
+                                <el-input v-model="audioText" :rows="2" type="textarea" style="width: 600px; margin-top: 10px;" 
+                                @blur="onChangeAudioText" placeholder="无" resize="none"/>
+                            </el-form-item>
+                            <el-form-item label="合作字幕组">
+                                <el-select
+                                    v-model="subTeamInfo" placeholder="请填写合作字幕组，没有可留空"
+                                    multiple filterable allow-create default-first-option
+                                    :reserve-keyword="false" style="width: 600px" @change="onChangeSubTeam"
+                                    >
+                                    <el-option
+                                        v-for="item in subTeamOptions"
+                                        :key="item.value"
+                                        :label="item.label"
+                                        :value="item.value"
+                                        />
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="中文吐槽" prop="comment_Ch">
+                                <el-input v-model="config.comment_Ch" :autosize="{minRows: 2}" type="textarea" :placeholder="'画质 XXXXXX...\n处理上 XXXXXX...'" />
+                            </el-form-item>
+                            <el-form-item label="英文吐槽" prop="comment_En">
+                                <el-input v-model="config.comment_En" :autosize="{minRows: 2}" type="textarea" :placeholder="'This BD ......\nPP: XXXX, XXXX, ...'" />
+                            </el-form-item>
+                            <el-form-item label="发布吐槽">
+                                <el-input v-model="config.nonsense" :autosize="{minRows: 2}" type="textarea" :placeholder="'好想看到会动的瑠衣酱 XXXXXXXXX ...'" />
+                            </el-form-item>
+                            <el-form-item label="RS选项">
+                                <el-checkbox label="该项目为Reseed项目" v-model="config.reseed" />
+                            </el-form-item>
+                            <el-form-item v-if="config.reseed" label="中文修正" :rules="{required: config.reseed, message: '请填写重发修正', trigger: 'change'}">
+                                <el-input v-model="config.rs_comment_Ch" type="textarea" :autosize="{minRows: 2}" :placeholder="'1. XXXXXX；\n2. XXXXXX。'" />
+                            </el-form-item>
+                            <el-form-item v-if="config.reseed" label="英文修正" :rules="{required: config.reseed, message: '请填写重发修正', trigger: 'change'}">
+                                <el-input v-model="config.rs_comment_En" type="textarea" :autosize="{minRows: 2}" :placeholder="'1. XXXXXX;\n2. XXXXXX.'" />
+                            </el-form-item>
+                            <el-form-item label="参与制作" prop="script">
+                                <el-row>
+                                    <span style="margin-right: 6px;">
+                                    <div>总监</div>
+                                    <el-input v-model="config.script" style="width: 140px;" :placeholder="'总监'" />
+                                    </span>
+                                    <span style="margin-right: 6px;">
+                                    <div>压制</div>
+                                    <el-input v-model="config.encode" style="width: 140px;" :placeholder="'压制'" /></span>
+                                    <span style="margin-right: 6px;">
+                                    <div>整理</div>
+                                    <el-input v-model="config.collate" style="width: 140px;" :placeholder="'整理'" /></span>
+                                    <span style="margin-right: 6px;">
+                                    <div>发布</div>
+                                    <el-input v-model="config.upload" style="width: 140px;" :placeholder="'发布'" /></span>
+                                </el-row>
+                            </el-form-item>
+                            <el-form-item label="资源提供者">
+                                <el-input v-model="config.providers" type="textarea" :autosize="{minRows: 3}" 
+                                :placeholder="'BD: XXXX@XXXX...\nSCAN: XXXX@XXXX...\nCD: XXXX@XXXX...'" />
+                            </el-form-item>
+                            <div v-if="!config.reseed" style="margin-bottom: 20px;">
+                                <span style="margin-left: 123px;">
+                                    <el-radio-group v-model="url_type">
+                                        <el-radio-button label="Html" value="html" />
+                                        <el-radio-button label="Markdown" value="md" />
+                                        <el-radio-button label="BBCode" value="bbcode" />
+                                    </el-radio-group>
+                                </span>
+                                <span>
+                                    <el-button style="float: right;text-align: right;" @click="loadFromTxt">
+                                        从url.txt加载<el-icon><Upload /></el-icon>
+                                    </el-button>
+                                </span>
+                            </div>
+                            <el-form-item v-if="!config.reseed && url_type == 'html'" label="对比图"
+                            :rules="{required: !config.reseed, message: '请填写对比图html部分', trigger: 'change'}">
+                                <el-input v-model="config.pictures_html" type="textarea" :autosize="{minRows: 10}" 
+                                :placeholder="'<p>Comparison (right click on the image and open it in a new tab to see the full-size one)<br/>........'" />
+                            </el-form-item>
+                            <el-form-item v-if="!config.reseed && url_type == 'md'" label="对比图" 
+                            :rules="{required: !config.reseed, message: '请填写对比图markdown部分', trigger: 'change'}">
+                                <el-input v-model="config.pictures_md" type="textarea" :autosize="{minRows: 10}" 
+                                :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                            </el-form-item>
+                            <el-form-item v-if="!config.reseed && url_type == 'bbcode'" label="对比图"
+                            :rules="{required: !config.reseed, message: '请填写对比图bbcode部分', trigger: 'change'}">
+                                <el-input v-model="config.pictures_bbcode" type="textarea" :autosize="{minRows: 10}" 
+                                :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                            </el-form-item>
+                            <el-form-item label="种子文件路径" prop="torrent">
+                                <el-input placeholder="选择一个文件" v-model="config.torrent">
+                                    <template #append>
+                                        <el-button @click="loadFile('torrent')" v-loading.fullscreen.lock="isLoading">
+                                            <el-icon><FolderOpened /></el-icon>
+                                        </el-button>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                            <el-form-item label="远程搜索">
+                                <el-switch v-model="remoteSearchEnable" active-text="启用" inactive-text="关闭" />
+                            </el-form-item>
+                            <el-form-item label="Bangumi标签">
+                                <el-select
+                                    v-model="config.tag" value-key="label" placeholder="请选择或添加Bangumi标签"
+                                    multiple filterable remote reserve-keyword remote-show-suffix
+                                    :remote-method="searchBangumiTags" :loading="isSearching" style="width: 750px"
+                                >
+                                    <el-option
+                                    v-for="item in BangumiTags"
+                                    :key="item.label"
+                                    :label="item.label"
+                                    :value="{label: item.label, value: item.value}"
+                                    />
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="Bangumi分类" prop="category_bangumi">
+                                <el-select v-model="config.category_bangumi" placeholder="选择一个分类" style="width: 240px">
+                                    <el-option 
+                                    v-for="item in BangumiOptions"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value" 
+                                    />
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="Nyaa Info" prop="information">
+                                <el-input v-model="config.information" placeholder="https://vcb-s.com/archives/138"/>
+                            </el-form-item>
+                            <el-form-item label="Nyaa分类" prop="category_nyaa">
+                                <el-select v-model="config.category_nyaa" placeholder="选择一个分类" style="width: 240px">
+                                    <el-option 
+                                    v-for="item in NyaaOptions"
+                                    :key="item.value"
+                                    :label="item.label"
+                                    :value="item.value" 
+                                    />
+                                </el-select>
+                            </el-form-item>
+                            <el-form-item label="Nyaa配置项">
+                                <el-checkbox label="Complete" v-model="config.completed" border />
+                                <el-checkbox label="Remake" v-model="config.remake" border />
+                            </el-form-item>
                         </el-form>
                     </div>
                     <div v-else>
@@ -505,7 +1238,7 @@
                                 <el-input v-model="config.title" placeholder="请填写标题" @blur="getBangumiTags()"/>
                             </el-form-item>
                             <el-form-item label="种子文件路径" prop="torrent">
-                                <el-input placeholder="选择一个文件" v-model="config.torrent" class="input-with-select">
+                                <el-input placeholder="选择一个文件" v-model="config.torrent">
                                     <template #append>
                                         <el-button @click="loadFile('torrent')" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
@@ -514,7 +1247,7 @@
                                 </el-input>
                             </el-form-item>
                             <el-form-item label="html文件路径" prop="path_html">
-                                <el-input placeholder="选择一个文件" v-model="config.path_html" class="input-with-select">
+                                <el-input placeholder="选择一个文件" v-model="config.path_html">
                                     <template #append>
                                         <el-button @click="loadFile('html')" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
@@ -523,7 +1256,7 @@
                                 </el-input>
                             </el-form-item>
                             <el-form-item label="md文件路径" prop="path_md">
-                                <el-input placeholder="选择一个文件" v-model="config.path_md" class="input-with-select">
+                                <el-input placeholder="选择一个文件" v-model="config.path_md">
                                     <template #append>
                                         <el-button @click="loadFile('md')" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
@@ -532,13 +1265,16 @@
                                 </el-input>
                             </el-form-item>
                             <el-form-item label="bbcode文件路径" prop="path_bbcode">
-                                <el-input placeholder="选择一个文件，若使用Bangumi团队同步留空" v-model="config.path_bbcode" class="input-with-select">
+                                <el-input placeholder="选择一个文件" v-model="config.path_bbcode">
                                     <template #append>
                                         <el-button @click="loadFile('bbcode')" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
                                         </el-button>
                                     </template>
                                 </el-input>
+                            </el-form-item>
+                            <el-form-item label="远程搜索">
+                                <el-switch v-model="remoteSearchEnable" active-text="启用" inactive-text="关闭" />
                             </el-form-item>
                             <el-form-item label="Bangumi标签">
                                 <el-select
@@ -588,10 +1324,10 @@
             </el-row>
             <el-row class="title">
                 <el-col>
-                    <el-button class="btn" :loading="isSaving" @click="saveWithFile()" type="primary" plain>
+                    <el-button class="btn" :loading="isSaving" @click="save()" type="primary" plain>
                         保存
                     </el-button>
-                    <el-button class="btn" :loading="isCreating" @click="createWithFile(createForm_file)" type="primary">
+                    <el-button class="btn" :loading="isCreating" @click="create()" type="primary">
                         下一步
                     </el-button>  
                 </el-col>  

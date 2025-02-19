@@ -10,10 +10,11 @@ const api = {
   SetProxyConfig: (config: string) => ipcRenderer.send('setProxyConfig', config), 
   CreateTask: async (path: string, config: PublishConfig) => await ipcRenderer.invoke('createTask', path, config) ,
   CreateWithFile: async (id: number, config: string) => await ipcRenderer.invoke('createWithFile', id, config), 
-  SaveWithFile: async (id: number, config: string) => await ipcRenderer.invoke('saveWithFile', id, config), 
+  CreateWithText: async (id: number, config: string) => await ipcRenderer.invoke('createWithText', id, config), 
+  SaveContent: async (id: number, config: string) => await ipcRenderer.invoke('saveContent', id, config), 
   OpenTask: async (id: number) => await ipcRenderer.invoke('openTask', id),
   CheckTask: async (id: number) => await ipcRenderer.invoke('checkTask', id),
-  SaveFileContent: async (id: number, type: string, content: string) => await ipcRenderer.invoke('saveFileContent', id, type, content), 
+  SaveFileContent: async (id: number, type: string, content: string, title: string) => await ipcRenderer.invoke('saveFileContent', id, type, content, title), 
   GetBangumiTags: async (query: string) => await ipcRenderer.invoke('getBangumiTag', query),
   SearchBangumiTags: async (query: string) => await ipcRenderer.invoke('searchBangumiTag', query),
   GetLoginInfo: async () => await ipcRenderer.invoke('getLoginInfo'),
@@ -36,6 +37,7 @@ const api = {
   ClearStorage: () => ipcRenderer.send('clearStorage'),
   WriteClipboard: (str: string) => ipcRenderer.send('writeClipboard', str),
   SearchPosts: (str: string) =>ipcRenderer.invoke("searchPosts", str),
+  LoadFromTxt: () =>ipcRenderer.invoke("loadFromTxt"),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

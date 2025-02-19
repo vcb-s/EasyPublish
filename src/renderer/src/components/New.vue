@@ -24,7 +24,7 @@
         {
             value: 'text',
             label: '从模板创建',
-            disabled: true //暂未开发
+            disabled: false //暂未开发
         }
     ]
     const rules = reactive<FormRules<ruleForm>>({
@@ -78,7 +78,7 @@
                     type: form.type == 'file' ? 'file' : 'text',
                     name: form.name,
                     torrent: '',
-                    information: '',
+                    information: 'https://vcb-s.com/archives/138',
                     title: '',
                     category_bangumi: '',
                     category_nyaa: '',

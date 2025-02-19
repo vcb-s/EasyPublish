@@ -14,14 +14,15 @@ export interface IElectronAPI {
   SetProxyConfig: (config: string) => void,
   OpenFile: (type: string) => Promise<string>,
   CreateWithFile: (id: number, config: string) => Promise<string>,
-  SaveWithFile: (id: number, config: string) => Promise<string>,
+  CreateWithText: (id: number, config: string) => Promise<string>,
+  SaveContent: (id: number, config: string) => Promise<string>,
   CreateTask: (path: string, config: PublishConfig) => Promise<string>,
   OpenTask: (id: number) => Promise<{
     config: PublishConfig | undefined,
     status: string
   }>
   CheckTask: (id: number) => Promise<Message_FileContent>
-  SaveFileContent: (id: number, type: string, content: string) => Promise<boolean>
+  SaveFileContent: (id: number, type: string, content: string, title: string) => Promise<boolean>
   GetBangumiTags: (query: string) => Promise
   SearchBangumiTags: (query: string) => Promise
   GetLoginInfo: () => Promise<string>
@@ -44,6 +45,7 @@ export interface IElectronAPI {
   ClearStorage: () => void
   WriteClipboard: (str: string) => void
   SearchPosts: (str: string) => Promise<Message_rsPosts[]>
+  LoadFromTxt: () =>Promise<string[]>
 }
 
 declare global {

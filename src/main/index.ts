@@ -3,6 +3,7 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import type { PublishConfig, 
   Content_file, 
+  Content_text,
   Message_PublishStatus,
   Message_LoginInfo, 
   Message_UAP,
@@ -17,6 +18,9 @@ import axiosRetry from 'axios-retry'
 import log from 'electron-log'
 import socksProxy from 'socks-proxy-agent'
 import appIcon from '../../build/icon.ico?asset'
+import commonmark from "commonmark"
+import md2bbc from 'markdown-to-bbcode'
+import html2md from 'turndown'
 
 /*
                    _ooOoo_
@@ -378,7 +382,7 @@ async function BTPublish(_event, id: number, type: string) {
       else formData.append('sort_id', '1')
       formData.append('team_id', team_id ? team_id[1] : '')
       formData.append('bt_data_title', config.title)
-      let imgsrc = html.match(/<img\ssrc="([\S]*?)"/)![1]
+      let imgsrc = html.match(/<img[\s\S]*?src="([\S]*?)"/)![1]
       formData.append('poster_url', imgsrc)
       formData.append('bt_data_intro', html)
       formData.append('tracker', '')
@@ -662,12 +666,13 @@ async function searchBangumiTags(_event, query: string) {
 //RS搜索文章
 async function searchPosts(_event, title: string) {
   let result: Message_rsPosts[] = []
-  const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?search=' + title, { responseType: 'json' })
+  const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?context=edit&search=' + title, { responseType: 'json' })
   response.data.forEach(item => {
     result.push({
       id: item.id,
       title: item.title.rendered,
-      content: item.content.rendered.split('<!--more-->')[0]
+      content: item.content.rendered.split('<!--more-->')[0],
+      raw: item.content.raw
     })
   })
   return result
@@ -678,11 +683,11 @@ async function createLoginWindow(type: string) {
 
   let url:string
   if (type == 'bangumi') url = 'https://bangumi.moe'
-  else if (type == 'nyaa') url = 'https://nyaa.si'
-  else if (type == 'acgrip') url = 'https://acg.rip'
-  else if (type == 'dmhy') url = 'https://www.dmhy.org'
-  else if (type == 'acgnx_g') url = 'https://www.acgnx.se'
-  else url = 'https://share.acgnx.se'
+  else if (type == 'nyaa') url = 'https://nyaa.si/login'
+  else if (type == 'acgrip') url = 'https://acg.rip/users/sign_in'
+  else if (type == 'dmhy') url = 'https://www.dmhy.org/user/login'
+  else if (type == 'acgnx_g') url = 'https://www.acgnx.se/user.php?o=login'
+  else url = 'https://share.acgnx.se/user.php?o=login'
 
   //获取并保存cookie信息
   async function setCookies(type: string, url: string) {
@@ -1013,7 +1018,6 @@ async function createTask(_event, path: string, config: PublishConfig) {
         const file: Content_file = {
           path_md: '',
           path_html: '',
-          path_site: '',
           path_bbcode: '',
         }
         config.content = file
@@ -1041,47 +1045,190 @@ async function createTask(_event, path: string, config: PublishConfig) {
   }
 }
 
-//从文件创建和保存
-async function saveConfigWithFile(id: number, config: PublishConfig) {
+//创建和保存
+async function saveConfig(id: number, config: PublishConfig) {
   let storage = db.data.posts.find(item => item.id == id)
   if (storage == undefined) return "taskNotFound"
   const oldConfig: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
   config.name = oldConfig.name;
   config.torrentname = config.torrent.replace(/^.*[\\\/]/, '');
-  (config.content as Content_file).path_site = (oldConfig.content as Content_file).path_site
   fs.writeFileSync(storage.path + '\\config.json', JSON.stringify(config))
   return storage.path
 }
 async function createWithFile(_event, id: number, config_: string) {
   try {
     let config: PublishConfig = JSON.parse(config_)
-    let isBBcodeExist = fs.existsSync((config.content as Content_file).path_bbcode)
-    if (!fs.existsSync((config.content as Content_file).path_md)) {
-      return "noSuchFile_md"
-    }
-    else if (!fs.existsSync((config.content as Content_file).path_html)) {
+    const result = await saveConfig(id, config)
+    if (result == 'taskNotFound') return 'taskNotFound'
+    if (!fs.existsSync(config.torrent)) return "noSuchFile_torrent"
+    if (!fs.existsSync((config.content as Content_file).path_html))
       return "noSuchFile_html"
-    }
-    else if (!fs.existsSync(config.torrent)) {
-      return "noSuchFile_torrent"
-    }
-    else {
-      const result = await saveConfigWithFile(id, config)
-      if (result == 'taskNotFound') return 'taskNotFound'
-      fs.copyFileSync((config.content as Content_file).path_md, result + '\\nyaa.md')
+    else 
       fs.copyFileSync((config.content as Content_file).path_html, result + '\\bangumi.html')
-      fs.copyFileSync(config.torrent, result + '\\' + config.torrent.replace(/^.*[\\\/]/, ''))
-      if (isBBcodeExist) fs.copyFileSync((config.content as Content_file).path_bbcode, result + '\\acgrip.bbcode')
-      return 'success'
-    }
+    if (!fs.existsSync((config.content as Content_file).path_md)) {
+      if ((config.content as Content_file).path_md != '') 
+        return 'noSuchFile_md'
+      let content = fs.readFileSync(result + '\\bangumi.html', {encoding: 'utf-8'})
+      var converter = new html2md()
+      let md = converter.turndown(content)
+      fs.writeFileSync(result + '\\nyaa.md', md)
+    } else
+      fs.copyFileSync((config.content as Content_file).path_html, result + '\\bangumi.html')
+    if (!fs.existsSync((config.content as Content_file).path_bbcode)) {
+      if ((config.content as Content_file).path_bbcode != '') 
+        return 'noSuchFile_bbcode'
+      let content = fs.readFileSync(result + '\\nyaa.md', {encoding: 'utf-8'})
+      content = content.replace(/!\[[\s\S]*?\]\(([\s\S]*?)\)/, '![]($1)')
+      let reader = new commonmark.Parser()
+      let writer = new md2bbc.BBCodeRenderer()
+      let parsed = reader.parse(content)
+      let bbcode = writer.render(parsed)
+      fs.writeFileSync(result + '\\acgrip.bbcode', bbcode)
+    } else
+      fs.copyFileSync((config.content as Content_file).path_bbcode, result + '\\acgrip.bbcode')
+    fs.copyFileSync(config.torrent, result + '\\' + config.torrent.replace(/^.*[\\\/]/, ''))
+    return 'success'
   } catch (err) {
     dialog.showErrorBox('错误', (err as Error).message)
     return 'failed'
   }
 }
-async function saveWithFile(_event, id: number, config_: string) {
+async function createWithText(_event, id: number, config_: string) {
+  try {
+    let config: PublishConfig = JSON.parse(config_)
+    let info = config.content as Content_text
+    const result = await saveConfig(id, config)
+    if (result == 'taskNotFound') return 'taskNotFound'
+    if (!fs.existsSync(config.torrent)) return "noSuchFile_torrent"
+    let content = '<p>\n'
+    content += `<img src="${info.picture_path}" alt="${info.picture_path.replace(/^.*[\\\/]/, '')}" /><br />\n<br />\n`
+    let note = ''
+    if (info.note)
+      info.note.forEach(item => { note += item + ' + ' })
+    if (note != '')
+      note = note.slice(0, -2)
+    let reseed = info.reseed ? ' Reseed' : ''
+    if (config.title.includes(info.Name_Jp)) {
+      if (info.Name_Ch != '')
+        content += info.Name_Ch + ' / '
+      content += `${info.Name_En} / ${info.Name_Jp} ${note} ${info.torrent_type}${reseed} <br />\n`
+    }
+    else {
+      if (info.Name_Ch) 
+        content += `${info.Name_Ch} ${note} ${info.torrent_type}${reseed} <br />\n`
+      content += `${info.Name_En} ${note} ${info.torrent_type}${reseed} <br />\n`
+      if (info.Name_Jp) 
+      content += `${info.Name_Jp} ${note} ${info.torrent_type}${reseed} <br />\n`
+    }
+    content += '<br />\n'
+    if (info.sub_Ch && info.sub_Ch != '') {
+      content += `${info.sub_Ch}<br />\n${info.sub_En}<br />\n`
+    }
+    if (info.audio_Ch && info.audio_Ch != '') {
+      content += `${info.audio_Ch}<br />\n${info.audio_En}<br />\n`
+    }
+    if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
+    if (info.nomination) {
+      content += '本番由 <strong>组员提名</strong> ，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。<br />\n'
+      content += 'This project was <strong>nominated by our members</strong> and produced upon request. Thanks to them for their selfless dedication to the development of VCB-Studio.<br />\n<br />\n'
+    }
+    let team_Ch = '', team_En = ''
+    if (info.subTeam_Ch && info.subTeam_En) {
+      info.subTeam_Ch.forEach(item => { team_Ch += item + ' & ' })
+      info.subTeam_En.forEach(item => { team_En += item + ' & ' })
+    }
+    if (team_Ch != ''){
+      team_Ch = team_Ch.slice(0, -3)
+      team_En = team_En.slice(0, -3)
+      content += `这个项目与 <strong>${team_Ch}</strong> 合作，感谢他们精心制作的字幕。<br />\n`
+      content += `This project is in collaboration with <strong>${team_En}</strong>. Thanks to them for elaborating Chinese subtitles.<br />\n<br />\n`
+    }
+    let comment_Ch = info.comment_Ch.split('\n')
+    let comment_En = info.comment_En.split('\n')
+    for (let i = 0; i <comment_Ch.length; i++){
+      content += comment_Ch[i] + '<br />\n'
+      content += comment_En[i] + '<br />\n<br />\n'
+    }
+    if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
+    if (info.nonsense) {
+      let nonsense = info.nonsense.split('\n')
+      nonsense.forEach(item => {
+        content += item + '<br />\n'
+      });
+    }
+    if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
+    content += '</p>\n<hr />\n<p>\n'
+    if (info.reseed) {
+      let rs_comment_Ch = info.rs_comment_Ch!.split('\n')
+      let rs_comment_En = info.rs_comment_En!.split('\n')
+      content += '重发修正：<br />\n'
+      rs_comment_Ch.forEach(item => {
+        content += item + '<br />\n'
+      });
+      content += '<br />\nReseed comment:<br />\n'
+      rs_comment_En.forEach(item => {
+        content += item + '<br />\n'
+      });
+      content += '<br />\n</p>\n<hr />\n<p>\n'
+    }
+    content += '感谢所有参与制作者 / Thanks to our participating members:<br />\n'
+    content += '总监 / Script: ' + info.members.script + '<br />\n'
+    content += '压制 / Encode: ' + info.members.encode + '<br />\n'
+    content += '整理 / Collate: ' + info.members.collate + '<br />\n'
+    content += '发布 / Upload: ' + info.members.upload + '<br />\n'
+    content += '分流 / Seed: VCB-Studio CDN 分流成员<br />\n'
+    if (info.providers && info.providers != '') {
+      let providers = info.providers.split('\n')
+      content += '<br />\n感谢所有资源提供者 / Thanks to all resource providers:<br />\n'
+      providers.forEach(item => {
+        content += item + '<br />\n'
+      });
+    }
+    content += '<br />\n</p>\n<hr />\n<p>\n'
+    if (info.reseed) {
+      content += '本次发布来自 VCB-Studio 旧作重发计划。我们会不定期重发过去发布过的合集，或为补充做种，或为修正制作错漏，或为整合系列合集。<br />\n'
+      content += 'This is a release of VCB-Studio Reseed Project. We would re-upload previous torrents from time to time, to resurrect old torrents with few seeders, to correct errors/omissions, or to batch separate releases that belong to a same series.<br />\n'
+      content += '<br />\n</p>\n<hr />\n<p>\n'
+    }
+    if (!info.reseed) {
+      content += ' VCB-Studio 已不再保证收集作品相关 CD 和扫图资源，详情请参见 <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a>。<br />\n'
+      content += 'Please refer to <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a> for more information about that VCB-Studio will no longer guarantee to include relevant CDs and scans.<br />\n<br />\n'
+      content += '本组（不）定期招募新成员。详情请参见 <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a>。<br />\n'
+      content += 'Please refer to <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a> about information of our (un)scheduled recruitment.<br />\n<br />\n'
+    }
+    content += '播放器教程索引： <a href="https://vcb-s.com/archives/16639" target="_blank">VCB-Studio 播放器推荐</a><br />\n'
+    content += '中文字幕分享区： <a href="https://bbs.acgrip.com/" target="_blank">Anime 分享论坛</a><br />\n'
+    content += '项目计划与列表： <a href="https://vcb-s.com/archives/138" target="_blank">VCB-Studio 项目列表</a><br />\n'
+    content += '特殊格式与说明： <a href="https://vcb-s.com/archives/7949" target="_blank">WebP 扫图说明</a><br />\n<br />\n</p>\n'
+    if (!info.reseed) {
+      content += '<hr />\n'
+    }
+    let converter = new html2md()
+    let md = converter.turndown(content)
+    let reader = new commonmark.Parser()
+    let bbcodeWriter = new md2bbc.BBCodeRenderer()
+    let parsed_bbcode = reader.parse(md)
+    let bbcode = bbcodeWriter.render(parsed_bbcode)
+    let html = content
+    if (!info.reseed) {
+      md += '\n\n' +  info.pictures_md
+      html += info.pictures_html
+      info.pictures_bbcode = info.pictures_bbcode!.replace(/IMG/g, 'img')
+      info.pictures_bbcode = info.pictures_bbcode!.replace(/URL/g, 'url')
+      bbcode += info.pictures_bbcode
+    }
+    fs.writeFileSync(result + '\\bangumi.html', html)
+    fs.writeFileSync(result + '\\nyaa.md', md)
+    fs.writeFileSync(result + '\\acgrip.bbcode', bbcode)
+    return 'success'
+  } catch (err) {
+    dialog.showErrorBox('错误', (err as Error).message)
+    return 'failed'
+  }
+}
+async function saveContent(_event, id: number, config_: string) {
   let config: PublishConfig = JSON.parse(config_)
-  const result = await saveConfigWithFile(id, config)
+  const result = await saveConfig(id, config)
   if (result == 'taskNotFound') return 'taskNotFound'
   else return 'success'
 }
@@ -1103,11 +1250,32 @@ async function openTask(_event, id: number) {
   }
 }
 
+//从url.txt加载对比图
+async function loadFromTxt(_event) {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties:[ 'openFile' ],
+    filters: [{name: 'txt', extensions:['txt']}]
+  })
+  if (canceled) return new String[3]
+  let content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
+  let html = content.match(/<p>[\s\S]*<\/p>/)![0]
+  let md = content.match(/\[!\[\]\([\s\S]*\)\s\s/)![0]
+  let bbcode = content.match(/\[URL=[\s\S]*\[\/URL\]/)![0]
+  const str = 'Comparison (right click on the image and open it in a new tab to see the full-size one)\n'
+            + 'Source________________________________________________Encode\n\n' 
+  html += '\n'
+  md = str + md
+  bbcode = str + bbcode + '\n'
+  bbcode = bbcode.replace(/IMG/g, 'img')
+  bbcode = bbcode.replace(/URL/g, 'url')
+  return [html, md, bbcode]
+} 
+
 //复查任务
 async function checkTask(_event, id: number) {
   try {
     let storage = db.data.posts.find(item => item.id == id)
-    let html = '', md = '', bbcode = ''
+    let html = '', md = '', bbcode = '', title = ''
     if (storage == undefined) 
       throw new Error('TaskNotFound:' + id)
     storage.step = 'check'
@@ -1120,7 +1288,11 @@ async function checkTask(_event, id: number) {
       md = fs.readFileSync(storage.path + '\\nyaa.md', {encoding: 'utf-8'})
     if (fs.existsSync(storage.path + '\\acgrip.bbcode'))
       bbcode = fs.readFileSync(storage.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
-    return {html: html, md: md, bbcode: bbcode}
+    if (fs.existsSync(storage.path + '\\config.json')) {
+      let content: PublishConfig = JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
+      title = content.title
+    }
+    return {html: html, md: md, bbcode: bbcode, title: title}
   } catch (err) {
     dialog.showErrorBox('错误', (err as Error).message)
     return {}
@@ -1128,7 +1300,7 @@ async function checkTask(_event, id: number) {
 }
 
 //保存文件内容
-async function saveFileContent(_event, id: number, type: string, content: string) {
+async function saveFileContent(_event, id: number, type: string, content: string, title: string) {
   try{
     let storage = db.data.posts.find(item => item.id == id)
     if (storage == undefined) 
@@ -1141,6 +1313,9 @@ async function saveFileContent(_event, id: number, type: string, content: string
       fs.writeFileSync(storage.path + '\\nyaa.md', content, {encoding: 'utf-8'})
     if (type == 'bbcode')
       fs.writeFileSync(storage.path + '\\acgrip.bbcode', content, {encoding: 'utf-8'})
+    let config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
+    config.title = title
+    fs.writeFileSync(storage.path + '\\config.json', JSON.stringify(config))
     return true
   }
   catch(err) {
@@ -1244,7 +1419,12 @@ async function getPublishInfo(_event, id: number) {
 //发布前检查登录情况
 async function checkAccount(_event, type: string) {
   await checkLoginStatus(type)
-  return db.data.cookies.find((item) => item.name == type)!.status
+  let result = db.data.cookies.find((item) => item.name == type)!.status
+  if (type == 'acgnx_a' && result == '防火墙阻止')
+    createLoginWindow('acgnx_a')
+  if (type == 'acgnx_g' && result == '防火墙阻止')
+    createLoginWindow('acgnx_g')
+  return result
 }
 
 //主站发布获取信息
@@ -1313,20 +1493,88 @@ async function getSiteInfo(_event, id: number) {
       }
       await db.write()
     }
+    result.push('萌番组：' + (storage.bangumi ? storage.bangumi : ''))
+    result.push('Nyaa：' + (storage.nyaa ? storage.nyaa : ''))
+    result.push('Acgrip：' + (storage.acgrip ? storage.acgrip : ''))
+    result.push('动漫花园：' + (storage.dmhy ? storage.dmhy : ''))
+    result.push('Acgnx：' + (storage.acgnx_g ? storage.acgnx_g : ''))
+    result.push('末日动漫：' + (storage.acgnx_a ? storage.acgnx_a : ''))
     //从文件创建
     if (config.type == 'file') {
-      result.push('萌番组：' + (storage.bangumi ? storage.bangumi : ''))
-      result.push('Nyaa：' + (storage.nyaa ? storage.nyaa : ''))
-      result.push('Acgrip：' + (storage.acgrip ? storage.acgrip : ''))
-      result.push('动漫花园：' + (storage.dmhy ? storage.dmhy : ''))
-      result.push('Acgnx：' + (storage.acgnx_g ? storage.acgnx_g : ''))
-      result.push('末日动漫：' + (storage.acgnx_a ? storage.acgnx_a : ''))
       result.push('')
       result.push('')
       return result
     }
-    //从模板创建，待开发
+    //从模板创建
     else {
+      let info = config.content as Content_text
+      let note = ''
+      if (info.note)
+        info.note.forEach(item => { note += item + ' + ' })
+      if (note != '')
+          note = note.slice(0, -2)
+      if (info.reseed)
+          note += 'Reseed Fin'
+      else
+          note += 'Fin'
+      let title = `${info.Name_En}${info.Name_Ch == '' ? '' : ' / ' +  info.Name_Ch} ${info.bit} ${info.resolution} ` 
+                + `${info.encoding} ${info.torrent_type} [${note}]`
+      result.push(title)
+      let team_Ch = '', content = ''
+      if (info.subTeam_Ch) {
+        info.subTeam_Ch.forEach(item => { team_Ch += item + ' & ' })
+      }
+      if (team_Ch != ''){
+        team_Ch = team_Ch.slice(0, -3)
+        content += `这个项目与 <strong>${team_Ch}</strong> 合作，感谢他们精心制作的字幕。\n\n`
+      }
+      content += info.comment_Ch + '\n\n'
+      if (info.sub_Ch && info.sub_Ch != '') {
+        content += info.sub_Ch + '\n'
+      }
+      if (info.audio_Ch && info.audio_Ch != '') {
+        content += info.audio_Ch + '\n'
+      }
+      if (content.slice(-2) != '\n\n') content += '\n'
+      if (info.nonsense && info.nonsense != '') {
+        content += info.nonsense + '\n\n'
+      }
+      content += '<!--more-->\n\n感谢所有参与制作者：\n'
+      content += `总监：${info.members.script}\n`
+      content += `压制：${info.members.encode}\n`
+      content += `整理：${info.members.collate}\n`
+      content += `发布：${info.members.upload}\n`
+      content += '分流：VCB-Studio CDN 分流成员\n\n'
+      if (info.reseed) {
+        content += '[box style="info"]\n重发修正：\n\n'
+        content += info.rs_comment_Ch + '\n[/box]\n\n'
+      }
+      content += '[box style="download"]\n'
+      content += `${info.bit} ${info.resolution} ${info.encoding}${info.reseed ? ' (Reseed)' : ''}`
+      if (storage.bangumi && storage.bangumi != '') {
+        content += `\n\n<a href="${storage.bangumi}" rel="noopener" target="_blank">${storage.bangumi}</a>`
+      }
+      if (storage.acgnx_a && storage.acgnx_a != '') {
+        content += `\n\n<a href="${storage.acgnx_a}" rel="noopener" target="_blank">${storage.acgnx_a}</a>`
+      }
+      if (storage.acgnx_g && storage.acgnx_g != '') {
+        content += `\n\n<a href="${storage.acgnx_g}" rel="noopener" target="_blank">${storage.acgnx_g}</a>`
+      }
+      if (storage.acgrip && storage.acgrip != '') {
+        content += `\n\n<a href="${storage.acgrip}" rel="noopener" target="_blank">${storage.acgrip}</a>`
+      }
+      if (storage.dmhy && storage.dmhy != '') {
+        content += `\n\n<a href="${storage.dmhy}" rel="noopener" target="_blank">${storage.dmhy}</a>`
+      }
+      if (storage.nyaa && storage.nyaa != '') {
+        content += `\n\n<a href="${storage.nyaa}" rel="noopener" target="_blank">${storage.nyaa}</a>`
+      }
+      content += '\n[/box]\n\n'
+      if (info.reseed) 
+        content += '<hr />\n\n请将旧链放于此\n\n'
+      content += '<label for="medie-info-switch" class="btn btn-inverse-primary" title="展开MediaInfo">MediaInfo</label>\n\n'
+      content += '<pre class="js-medie-info-detail medie-info-detail" style="display: none">\n请将MediaInfo放置于此\n</pre>'
+      result.push(content)
       return result
     }
   }
@@ -1448,7 +1696,8 @@ app.whenReady().then(async () => {
   ipcMain.handle('openFile', handleFileOpen)
   ipcMain.handle('createTask', createTask)
   ipcMain.handle("createWithFile", createWithFile)
-  ipcMain.handle("saveWithFile", saveWithFile)
+  ipcMain.handle("createWithText", createWithText)
+  ipcMain.handle("saveContent", saveContent)
   ipcMain.handle('openTask', openTask)
   ipcMain.handle('checkTask', checkTask)
   ipcMain.handle('saveFileContent', saveFileContent)
@@ -1467,6 +1716,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('setSiteUAP', setSiteUAP)
   ipcMain.handle('getSiteSrc', getSiteSrc)
   ipcMain.handle('searchPosts', searchPosts)
+  ipcMain.handle('loadFromTxt', loadFromTxt)
   ipcMain.on('setProxyConfig', setProxyConfig)
   ipcMain.on('setUAP', setUAP)
   ipcMain.on('checkLoginStatus', checkAllLoginStatus)
