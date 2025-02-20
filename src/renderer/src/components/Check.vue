@@ -26,6 +26,7 @@
     const html = ref('')
     const md = ref('')
     const bbcode = ref('')
+    const title = ref('')
     const html_rendered = computed(() => {
         if (html.value == '') return empty
         else return html.value
@@ -58,6 +59,7 @@
         html.value = result.html
         md.value = result.md
         bbcode.value = result.bbcode
+        title.value = result.title
     }
 
     //保存文件内容
@@ -66,7 +68,7 @@
         if (file_type.value == 'html') content = html.value
         else if (file_type.value == 'md') content = md.value
         else content = bbcode.value
-        let result = await window.api.SaveFileContent(props.id, file_type.value, content)
+        let result = await window.api.SaveFileContent(props.id, file_type.value, content, title.value)
         if (result)
             ElMessage({
                 message: '保存成功',
@@ -101,7 +103,6 @@
 <template>
     <div :style="{height: slbHeight}">
         <el-scrollbar style="height: 100%;">
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row style="font-size: xx-large; height: 43px; ">
                 <el-col :span="3" />
@@ -110,7 +111,6 @@
                 </el-col>
                 <el-col :span="3" />
             </el-row>
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row justify="space-between">
                 <el-col :span="3" />
@@ -140,10 +140,10 @@
                             </el-button-group>
                         </span>
                     </div>
+                    <el-input v-model="title" style="margin-top: 20px;" />
                 </el-col>
                 <el-col :span="3" />
             </el-row>
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row justify="space-between">
                 <el-col :span="3" />
@@ -187,7 +187,6 @@
                 </el-col>
                 <el-col :span="3" />
             </el-row>
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row class="title">
                 <el-col>

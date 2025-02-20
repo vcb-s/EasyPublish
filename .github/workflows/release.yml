@@ -1,16 +1,15 @@
 name: 构建并发布Release
 
 on: 
-    pull_request:  
-        types:
-          - closed
-        branches: 
-          - main
-    workflow_dispatch: 
+  push:
+    branches:
+      - "main"
+    tags:
+      - "v*.*.*"
+  workflow_dispatch: 
 
 jobs:
     build:
-      if: github.event.pull_request.merged == true
       name: 编译构建
       runs-on: windows-latest
 
@@ -40,7 +39,10 @@ jobs:
             tag_name: v${{ env.PACKAGE_VERSION }}
             name: ${{ env.PACKAGE_VERSION }}
             draft: true
+            token: ${{ secrets.RELEASE }}
             prerelease: false
+            target_commitish: ${{ github.sha }}
+            repository: vcb-s/EasyPublish
             body_path: NEW.md
             files: |
               ./dist/*.exe

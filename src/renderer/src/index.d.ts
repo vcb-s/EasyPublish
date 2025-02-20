@@ -1,20 +1,25 @@
 
 export interface Content_text {
-  sub: string
   Name_Ch: string
   Name_En: string
   Name_Jp: string
   bit: string
   resolution: string
-  encoding: string  
+  encoding: string
   torrent_type: string
+  reseed: boolean
+  nomination: boolean
   note: string[]
+  sub_Ch?: string
+  sub_En?: string
   audio_Ch?: string
   audio_En?: string
   comment_Ch: string
   comment_En: string
-  subTeam_Ch?: string
-  subTeam_En?: string
+  rs_comment_Ch?: string
+  rs_comment_En?: string
+  subTeam_Ch?: string[]
+  subTeam_En?: string[]
   nonsense?: string
   members: {
     script: string
@@ -22,20 +27,16 @@ export interface Content_text {
     collate: string
     upload: string
   }
-  providers:{
-    BD: string[]
-    Scan: string[]
-    CD: string[]
-  }
-  pictures_html: string
-  pictures_md: string
-  picture_title: string
+  providers?: string
+  pictures_html?: string
+  pictures_md?: string
+  pictures_bbcode?: string
+  picture_path: string
 }
 
 export interface Content_file {
   path_md: string
   path_html: string
-  path_site: string
   path_bbcode: string
 }
 
@@ -58,6 +59,7 @@ export interface Message_FileContent {
   html: string
   md: string
   bbcode: string
+  title: string
 }
 
 export interface Message_LoginInfo{
@@ -98,4 +100,5 @@ export interface Message_rsPosts{
   id: number
   title: string
   content: string
+  raw: string
 }

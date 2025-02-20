@@ -24,7 +24,7 @@
         {
             value: 'text',
             label: '从模板创建',
-            disabled: true //暂未开发
+            disabled: false //暂未开发
         }
     ]
     const rules = reactive<FormRules<ruleForm>>({
@@ -78,7 +78,7 @@
                     type: form.type == 'file' ? 'file' : 'text',
                     name: form.name,
                     torrent: '',
-                    information: '',
+                    information: 'https://vcb-s.com/archives/138',
                     title: '',
                     category_bangumi: '',
                     category_nyaa: '',
@@ -143,15 +143,7 @@
                             </el-input>
                         </el-form-item>
                         <el-form-item label="任务类型" prop="type">
-                            <el-select v-model="form.type" placeholder="选择一个模式" style="width: 240px">
-                                <el-option 
-                                v-for="item in options"
-                                :key="item.value"
-                                :label="item.label"
-                                :value="item.value" 
-                                :disabled="item.disabled"
-                                />
-                            </el-select>
+                            <el-select-v2 v-model="form.type" placeholder="选择一个模式" :options="options" style="width: 240px" />
                         </el-form-item>
                     </el-form> 
                 </el-col>
