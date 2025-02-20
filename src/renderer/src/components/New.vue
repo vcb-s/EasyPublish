@@ -143,15 +143,7 @@
                             </el-input>
                         </el-form-item>
                         <el-form-item label="任务类型" prop="type">
-                            <el-select v-model="form.type" placeholder="选择一个模式" style="width: 240px">
-                                <el-option 
-                                v-for="item in options"
-                                :key="item.value"
-                                :label="item.label"
-                                :value="item.value" 
-                                :disabled="item.disabled"
-                                />
-                            </el-select>
+                            <el-select-v2 v-model="form.type" placeholder="选择一个模式" :options="options" style="width: 240px" />
                         </el-form-item>
                     </el-form> 
                 </el-col>

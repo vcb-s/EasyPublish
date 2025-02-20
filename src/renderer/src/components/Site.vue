@@ -249,18 +249,8 @@
                                 </el-input>
                             </el-form-item>
                             <el-form-item v-if="!isRS" label="分类">
-                                <el-select
-                                    v-model="category"
-                                    multiple
-                                    placeholder="选择类别"
-                                    style="width: 250px"
-                                >
-                                    <el-option
-                                        v-for="item in options"
-                                        :label="item.label"
-                                        :value="item.value"
-                                    />
-                                </el-select>
+                                <el-select-v2 v-model="category" :options="options"
+                                    multiple placeholder="选择类别" style="width: 250px" />
                             </el-form-item>
                         </el-form>
                     </div>

@@ -1,5 +1,5 @@
 <script setup lang="ts" name="Create">
-    import { defineProps, onMounted, ref, reactive, computed } from "vue"
+    import { defineProps, onMounted, ref, reactive } from "vue"
     import type { PublishConfig, Content_text } from '../index.d.ts'
     import { useRouter } from 'vue-router'
     import type { FormRules } from 'element-plus'
@@ -220,22 +220,6 @@
             value: '8-bit'
         }
     ])
-    const isAddingBitOption = ref(false)
-    const newBitOption = ref('')
-    const onAddBitOption = () => {  isAddingBitOption.value = true  }
-    const onConfirmBitOption = () => {
-        if (newBitOption.value) {
-            bitOptions.value.push({
-            label: newBitOption.value,
-            value: newBitOption.value,
-            })
-            clearBitOption()
-        }
-    }
-    const clearBitOption = () => {
-        newBitOption.value = ''
-        isAddingBitOption.value = false
-    }
     //设置分辨率
     const resolutionOptions = ref([
         {
@@ -251,22 +235,6 @@
             value: '2160p'
         }
     ])
-    const isAddingResolutionOption = ref(false)
-    const newResolutionOption = ref('')
-    const onAddResolutionOption = () => {    isAddingResolutionOption.value = true    }
-    const onConfirmResolutionOption = () => {
-    if (newBitOption.value) {
-        bitOptions.value.push({
-        label: newBitOption.value,
-        value: newBitOption.value,
-        })
-        clearBitOption()
-    }
-    }
-    const clearResolutionOption = () => {
-        newResolutionOption.value = ''
-        isAddingResolutionOption.value = false
-    }
     //设置编码
     const encodingOptions = ref([
         {
@@ -282,22 +250,6 @@
             value: 'AVC/HEVC'
         }
     ])
-    const isAddingEncodingOption = ref(false)
-    const newEncodingOption = ref('')
-    const onAddEncodingOption = () => {    isAddingEncodingOption.value = true    }
-    const onConfirmEncodingOption = () => {
-        if (newEncodingOption.value) {
-            encodingOptions.value.push({
-            label: newEncodingOption.value,
-            value: newEncodingOption.value,
-            })
-            clearEncodingOption()
-        }
-    }
-    const clearEncodingOption = () => {
-        newEncodingOption.value = ''
-        isAddingEncodingOption.value = false
-    }
     //设置类型
     const typeOptions = ref([
         {
@@ -309,22 +261,6 @@
             value: 'DVDRip'
         }
     ])
-    const isAddingTypeOption = ref(false)
-    const newTypeOption = ref('')
-    const onAddTypeOption = () => {    isAddingTypeOption.value = true    }
-    const onConfirmTypeOption = () => {
-        if (newTypeOption.value) {
-            typeOptions.value.push({
-            label: newTypeOption.value,
-            value: newTypeOption.value,
-            })
-            clearTypeOption()
-        }
-    }
-    const clearTypeOption = () => {
-        newTypeOption.value = ''
-        isAddingTypeOption.value = false
-    }
     //设置内容量
     const noteOptions = ref([
         {
@@ -576,21 +512,28 @@
     //设置Bangumi标签
     const remoteSearchEnable = ref(true)
     const isSearching = ref(false)
-    let suggestedBangumiTags =  ref<{label:string, value:string}[]>([])
-    let inputBangumiTags= ref<{label:string, value:string}[]>([])
-    const BangumiTags = computed(() => {
-        return inputBangumiTags.value.concat(suggestedBangumiTags.value)
-    })
+    type TagOptions = {
+        label: string
+        value: {
+            label: string
+            value: string
+        }
+    }
+    let suggestedBangumiTags: TagOptions[] = []
+    let inputBangumiTags: TagOptions[] = []
+    const BangumiTags = ref<TagOptions[]>([])
     async function getBangumiTags() {
         if (!remoteSearchEnable.value) 
             return
-        let title = generateConfig().title
+        let { title } = await generateConfig()
         const {data, status} = await window.api.GetBangumiTags(type ? config.title : title)
         if (status == 200) {
-            suggestedBangumiTags.value = []
-            for (const item of data) {
-                if (item.type != 'misc') suggestedBangumiTags.value.push({label: item.name, value: item._id})
+            suggestedBangumiTags = []
+            for (let item of data) {
+                if (item.type != 'misc') 
+                    suggestedBangumiTags.push({label: item.name, value: {label: item.name ,value: item._id}})
             }
+            BangumiTags.value = suggestedBangumiTags.concat(inputBangumiTags)
         }
         else if (status == 0) {
             ElMessage.error('请求Bangumi标签建议错误，错误信息详见日志')
@@ -604,11 +547,12 @@
             return
         const {data, status} = await window.api.SearchBangumiTags(query)
         if (status == 200) {
-            inputBangumiTags.value = []
+            inputBangumiTags = []
             if (data.success) {
                 for (const item of data.tag) {
-                    if (item.type != 'misc') inputBangumiTags.value.push({label: item.name, value: item._id})
+                    if (item.type != 'misc') inputBangumiTags.push({label: item.name, value: {label: item.name ,value: item._id}})
                 }
+                BangumiTags.value = suggestedBangumiTags.concat(inputBangumiTags)
             }
         } 
         else if (status == 0) {
@@ -632,7 +576,7 @@
     }
 
     //生成发布配置
-    function generateConfig() {
+    async function generateConfig() {
         if (type.value) {
             let publishConfig: PublishConfig = {
                 type: 'file',
@@ -737,7 +681,7 @@
         isCreating.value = true
         await formEl.validate(async (valid, _fields) => {
             if (valid) {
-                let publishConfig: PublishConfig = generateConfig()
+                let publishConfig: PublishConfig = await generateConfig()
                 let result = await window.api.CreateWithFile(props.id, JSON.stringify(publishConfig))
                 if (result.includes("success")) {
                     ElMessage({
@@ -782,7 +726,7 @@
         isCreating.value = true
         await formEl.validate(async (valid, _fields) => {
             if (valid) {
-                let publishConfig: PublishConfig = generateConfig()
+                let publishConfig: PublishConfig = await generateConfig()
                 let result = await window.api.CreateWithText(props.id, JSON.stringify(publishConfig))
                 if (result.includes("success")) {
                     ElMessage({
@@ -816,7 +760,7 @@
     const isSaving = ref(false)
     async function saveWithFile() {
         isSaving.value = true
-        let publishConfig: PublishConfig = generateConfig()
+        let publishConfig: PublishConfig = await generateConfig()
         let result = await window.api.SaveContent(props.id, JSON.stringify(publishConfig))
         if (result.includes("success")) {
             ElMessage({
@@ -835,7 +779,7 @@
     }
     async function saveWithText() {
         isSaving.value = true
-        let publishConfig: PublishConfig = generateConfig()
+        let publishConfig: PublishConfig = await generateConfig()
         let result = await window.api.SaveContent(props.id, JSON.stringify(publishConfig))
         if (result.includes("success")) {
             ElMessage({
@@ -899,6 +843,9 @@
         }else{
             Object.assign(config, result.config, result.config!.content)
             type.value = result.config!.type == 'file'
+            config.tag.map((val) => {
+                BangumiTags.value.push({label: val.label, value: val})
+            })
             if (!type.value) {
                 Object.assign(config, (result.config!.content as Content_text).members)
                 if (config.sub_Ch != '' && config.sub_En != '')
@@ -952,161 +899,57 @@
                                 </el-input>
                             </el-form-item>
                             <el-form-item label="内容量">
-                                <el-select
+                                <el-select-v2
                                     v-model="config.note" placeholder="请填写内容量，无需标注可留空"
                                     multiple filterable allow-create default-first-option
-                                    :reserve-keyword="false" style="width: 600px"
-                                    >
-                                    <el-option
-                                        v-for="item in noteOptions"
-                                        :key="item.value"
-                                        :label="item.label"
-                                        :value="item.value"
-                                        />
-                                </el-select>
+                                    :options="noteOptions" :reserve-keyword="false" style="width: 600px"
+                                    />
                             </el-form-item>
                             <el-form-item label="位深" prop="bit">
-                                <el-select v-model="config.bit" placeholder="请填写位深" style="width: 150px" @change="getBangumiTags()">
-                                    <el-option
-                                    v-for="item in bitOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value"
-                                    />
-                                    <template #footer>
-                                        <el-button v-if="!isAddingBitOption" text bg size="small" @click="onAddBitOption">添加</el-button>
-                                        <template v-else>
-                                            <el-input
-                                            v-model="newBitOption"
-                                            class="option-input"
-                                            placeholder="添加位深选项"
-                                            size="small"
-                                            />
-                                            <el-button type="primary" size="small" @click="onConfirmBitOption">确认</el-button>
-                                            <el-button size="small" @click="clearBitOption">取消</el-button>
-                                        </template>
-                                    </template>
-                                </el-select>
+                                <el-select-v2 v-model="config.bit" allow-create :options="bitOptions" :reserve-keyword="false" 
+                                placeholder="请填写位深" style="width: 150px" @change="getBangumiTags()" filterable />
                             </el-form-item>
                             <el-form-item label="分辨率" prop="resolution">
-                                <el-select v-model="config.resolution" placeholder="请填写分辨率" style="width: 150px" @change="getBangumiTags()">
-                                    <el-option
-                                    v-for="item in resolutionOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value"
-                                    />
-                                    <template #footer>
-                                        <el-button v-if="!isAddingResolutionOption" text bg size="small" @click="onAddResolutionOption">添加</el-button>
-                                        <template v-else>
-                                            <el-input
-                                            v-model="newResolutionOption"
-                                            class="option-input"
-                                            placeholder="添加分辨率选项"
-                                            size="small"
-                                            />
-                                            <el-button type="primary" size="small" @click="onConfirmResolutionOption">确认</el-button>
-                                            <el-button size="small" @click="clearResolutionOption">取消</el-button>
-                                        </template>
-                                    </template>
-                                </el-select>
+                                <el-select-v2 v-model="config.resolution" allow-create :options="resolutionOptions" :reserve-keyword="false" 
+                                placeholder="请填写分辨率" style="width: 150px" @change="getBangumiTags()" filterable />
                             </el-form-item>
                             <el-form-item label="编码" prop="encoding">
-                                <el-select v-model="config.encoding" placeholder="请填写编码" style="width: 150px" @change="getBangumiTags()">
-                                    <el-option
-                                    v-for="item in encodingOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value"
-                                    />
-                                    <template #footer>
-                                        <el-button v-if="!isAddingEncodingOption" text bg size="small" @click="onAddEncodingOption">添加</el-button>
-                                        <template v-else>
-                                            <el-input
-                                            v-model="newEncodingOption"
-                                            class="option-input"
-                                            placeholder="添加编码选项"
-                                            size="small"
-                                            />
-                                            <el-button type="primary" size="small" @click="onConfirmEncodingOption">确认</el-button>
-                                            <el-button size="small" @click="clearEncodingOption">取消</el-button>
-                                        </template>
-                                    </template>
-                                </el-select>
+                                <el-select-v2 v-model="config.encoding" allow-create :options="encodingOptions" :reserve-keyword="false" 
+                                placeholder="请填写编码" style="width: 150px" @change="getBangumiTags()" filterable />
                             </el-form-item>
                             <el-form-item label="类型" prop="torrent_type">
-                                <el-select v-model="config.torrent_type" placeholder="请填写类型" style="width: 150px" @change="getBangumiTags()">
-                                    <el-option
-                                    v-for="item in typeOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value"
-                                    />
-                                    <template #footer>
-                                        <el-button v-if="!isAddingTypeOption" text bg size="small" @click="onAddTypeOption">添加</el-button>
-                                        <template v-else>
-                                            <el-input
-                                            v-model="newTypeOption"
-                                            class="option-input"
-                                            placeholder="添加类型选项"
-                                            size="small"
-                                            />
-                                            <el-button type="primary" size="small" @click="onConfirmTypeOption">确认</el-button>
-                                            <el-button size="small" @click="clearTypeOption">取消</el-button>
-                                        </template>
-                                    </template>
-                                </el-select>
+                                <el-select-v2 v-model="config.torrent_type" allow-create :options="typeOptions" :reserve-keyword="false" 
+                                placeholder="请填写类型" style="width: 150px" @change="getBangumiTags()" filterable />
                             </el-form-item>
                             <el-form-item label="提名情况">
                                 <el-checkbox label="组员提名项目" v-model="config.nomination" border />
                             </el-form-item>
                             <el-form-item label="字幕信息">
-                                <el-select
+                                <el-select-v2
                                     v-model="subInfo" placeholder="请选择内封字幕信息，没有可留空"
-                                    multiple filterable allow-create default-first-option
+                                    multiple filterable allow-create :options="subOptions"
                                     :reserve-keyword="false" style="width: 600px"
                                     @change="onChangeSubInfo"
-                                    >
-                                    <el-option
-                                        v-for="item in subOptions"
-                                        :key="item.value"
-                                        :label="item.label"
-                                        :value="item.value"
-                                        />
-                                </el-select>
+                                    />
                                 <el-input v-model="subText" :rows="2" type="textarea" style="width: 600px; margin-top: 10px;" 
                                 @blur="onChangeSubText" placeholder="无" resize="none"/>
                             </el-form-item>
                             <el-form-item label="音轨信息">
-                                <el-select
+                                <el-select-v2
                                     v-model="audioInfo" placeholder="请选择内封和外挂音轨信息，没有可留空"
-                                    multiple filterable default-first-option
+                                    multiple filterable :options="audioOptions"
                                     :reserve-keyword="false" style="width: 600px"
                                     @change="onChangeAudioInfo"
-                                    >
-                                    <el-option
-                                        v-for="item in audioOptions"
-                                        :key="item.value"
-                                        :label="item.label"
-                                        :value="item.value"
-                                        />
-                                </el-select>
+                                    />
                                 <el-input v-model="audioText" :rows="2" type="textarea" style="width: 600px; margin-top: 10px;" 
                                 @blur="onChangeAudioText" placeholder="无" resize="none"/>
                             </el-form-item>
                             <el-form-item label="合作字幕组">
-                                <el-select
+                                <el-select-v2
                                     v-model="subTeamInfo" placeholder="请填写合作字幕组，没有可留空"
-                                    multiple filterable allow-create default-first-option
+                                    multiple filterable allow-create :options="subTeamOptions"
                                     :reserve-keyword="false" style="width: 600px" @change="onChangeSubTeam"
-                                    >
-                                    <el-option
-                                        v-for="item in subTeamOptions"
-                                        :key="item.value"
-                                        :label="item.label"
-                                        :value="item.value"
-                                        />
-                                </el-select>
+                                    />
                             </el-form-item>
                             <el-form-item label="中文吐槽" prop="comment_Ch">
                                 <el-input v-model="config.comment_Ch" :autosize="{minRows: 2}" type="textarea" :placeholder="'画质 XXXXXX...\n处理上 XXXXXX...'" />
@@ -1189,41 +1032,20 @@
                                 <el-switch v-model="remoteSearchEnable" active-text="启用" inactive-text="关闭" />
                             </el-form-item>
                             <el-form-item label="Bangumi标签">
-                                <el-select
-                                    v-model="config.tag" value-key="label" placeholder="请选择或添加Bangumi标签"
-                                    multiple filterable remote reserve-keyword remote-show-suffix
-                                    :remote-method="searchBangumiTags" :loading="isSearching" style="width: 750px"
-                                >
-                                    <el-option
-                                    v-for="item in BangumiTags"
-                                    :key="item.label"
-                                    :label="item.label"
-                                    :value="{label: item.label, value: item.value}"
-                                    />
-                                </el-select>
+                                <el-select-v2
+                                    v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
+                                    multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
+                                    :remote-method="searchBangumiTags" :loading="isSearching"
+                                />
                             </el-form-item>
                             <el-form-item label="Bangumi分类" prop="category_bangumi">
-                                <el-select v-model="config.category_bangumi" placeholder="选择一个分类" style="width: 240px">
-                                    <el-option 
-                                    v-for="item in BangumiOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value" 
-                                    />
-                                </el-select>
+                                <el-select-v2 v-model="config.category_bangumi" :options="BangumiOptions" placeholder="选择一个分类" style="width: 240px" />
                             </el-form-item>
                             <el-form-item label="Nyaa Info" prop="information">
                                 <el-input v-model="config.information" placeholder="https://vcb-s.com/archives/138"/>
                             </el-form-item>
                             <el-form-item label="Nyaa分类" prop="category_nyaa">
-                                <el-select v-model="config.category_nyaa" placeholder="选择一个分类" style="width: 240px">
-                                    <el-option 
-                                    v-for="item in NyaaOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value" 
-                                    />
-                                </el-select>
+                                <el-select-v2 v-model="config.category_nyaa" :options="NyaaOptions" placeholder="选择一个分类" style="width: 240px" />
                             </el-form-item>
                             <el-form-item label="Nyaa配置项">
                                 <el-checkbox label="Complete" v-model="config.completed" border />
@@ -1277,41 +1099,20 @@
                                 <el-switch v-model="remoteSearchEnable" active-text="启用" inactive-text="关闭" />
                             </el-form-item>
                             <el-form-item label="Bangumi标签">
-                                <el-select
-                                    v-model="config.tag" value-key="label" placeholder="请选择或添加Bangumi标签"
-                                    multiple filterable remote reserve-keyword remote-show-suffix
-                                    :remote-method="searchBangumiTags" :loading="isSearching" style="width: 750px"
-                                >
-                                    <el-option
-                                    v-for="item in BangumiTags"
-                                    :key="item.label"
-                                    :label="item.label"
-                                    :value="{label: item.label, value: item.value}"
-                                    />
-                                </el-select>
+                                <el-select-v2
+                                    v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
+                                    multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
+                                    :remote-method="searchBangumiTags" :loading="isSearching"
+                                />
                             </el-form-item>
                             <el-form-item label="Bangumi分类" prop="category_bangumi">
-                                <el-select v-model="config.category_bangumi" placeholder="选择一个分类" style="width: 240px">
-                                    <el-option 
-                                    v-for="item in BangumiOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value" 
-                                    />
-                                </el-select>
+                                <el-select-v2 v-model="config.category_bangumi" :options="BangumiOptions" placeholder="选择一个分类" style="width: 240px" />
                             </el-form-item>
                             <el-form-item label="Nyaa Info" prop="information">
                                 <el-input v-model="config.information" placeholder="https://vcb-s.com/archives/138"/>
                             </el-form-item>
                             <el-form-item label="Nyaa分类" prop="category_nyaa">
-                                <el-select v-model="config.category_nyaa" placeholder="选择一个分类" style="width: 240px">
-                                    <el-option 
-                                    v-for="item in NyaaOptions"
-                                    :key="item.value"
-                                    :label="item.label"
-                                    :value="item.value" 
-                                    />
-                                </el-select>
+                                <el-select-v2 v-model="config.category_nyaa" :options="NyaaOptions" placeholder="选择一个分类" style="width: 240px" />
                             </el-form-item>
                             <el-form-item label="Nyaa配置项">
                                 <el-checkbox label="Complete" v-model="config.completed" border />

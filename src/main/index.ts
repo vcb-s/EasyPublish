@@ -1639,6 +1639,12 @@ function createWindow(): void {
   })
   mainWindowWebContent = mainWindow.webContents
 
+  //监听程序崩溃
+  mainWindowWebContent.on('render-process-gone', (_e, detail) => {
+    console.log(detail)
+    app.quit()
+  })
+
   //窗口控制
   ipcMain.on("WinHandle", (_event, command: string) => {
     if (command == "close") {
