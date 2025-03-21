@@ -246,12 +246,7 @@ async function BTPublish(_event, id: number, type: string) {
         await sleep(1000)
         let result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
         for (let index = 0; index < 5; index++) {
-          if (result.status == 200 && 
-            result.data.sync.acgnx && 
-            result.data.sync.acgnx_int && 
-            result.data.sync.acgrip && 
-            result.data.sync.dmhy
-          ){ 
+          if (result.status == 200 && 'sync' in result.data){ 
             storage.sync = false
             await db.write()
             break
@@ -592,8 +587,8 @@ async function sitePublish(_event, id: number, title: string, content: string, i
     let imgData = new FormData()
     imgData.append('file', new Blob([img]), imgsrc.replace(/^.*[\\\/]/, ''))
     const result = await axios.post('https://vcb-s.com/wp-json/wp/v2/media', imgData, { responseType: 'json' })
-    if (result.status != 201)
-      throw result
+    if (result.status == 401) return 'unauthorized'
+    if (result.status != 201) throw result
     let data = {
       title: title,
       content: content,
@@ -608,7 +603,6 @@ async function sitePublish(_event, id: number, title: string, content: string, i
       return 'success'
     }
     if (response.status == 400) return 'empty'
-    if (response.status == 401) return 'unauthorized'
     throw response
   }
   catch (err) {
@@ -630,7 +624,6 @@ async function siteRSPublish(_event, id: number, rsID: number, title: string, co
       db.data.posts.find((item) => item.id == id)!.site = response.data.link
       return 'success'
     }
-    console.log(response)
     if (response.status == 400) return 'empty'
     if (response.status == 401) return 'unauthorized'
     throw response
@@ -979,6 +972,11 @@ async function setSiteUAP(_event, op: boolean, username: string, password: strin
   return [config.username, config.password]
 }
 
+//打开项目目录
+async function openDirectory(_event, path: string){
+  shell.openPath(path)
+}
+
 //打开文件(夹)
 async function handleFileOpen(_event, type: string) {
   const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -1078,7 +1076,6 @@ async function createWithFile(_event, id: number, config_: string) {
       if ((config.content as Content_file).path_bbcode != '') 
         return 'noSuchFile_bbcode'
       let content = fs.readFileSync(result + '\\nyaa.md', {encoding: 'utf-8'})
-      content = content.replace(/!\[[\s\S]*?\]\(([\s\S]*?)\)/, '![]($1)')
       let reader = new commonmark.Parser()
       let writer = new md2bbc.BBCodeRenderer()
       let parsed = reader.parse(content)
@@ -1107,18 +1104,21 @@ async function createWithText(_event, id: number, config_: string) {
       info.note.forEach(item => { note += item + ' + ' })
     if (note != '')
       note = note.slice(0, -2)
-    let reseed = info.reseed ? ' Reseed' : ''
+    let reseed = info.reseed ? ` Reseed${info.rs_version > 1 ? ` v${info.rs_version}` : ''}` : ''
     if (config.title.includes(info.Name_Jp)) {
       if (info.Name_Ch != '')
         content += info.Name_Ch + ' / '
-      content += `${info.Name_En} / ${info.Name_Jp} ${note} ${info.torrent_type}${reseed} <br />\n`
+      content += info.Name_En
+      if (info.Name_Jp != '')
+        content += ` / ${info.Name_Jp} `
+      content += ` ${note} ${info.torrent_type}${reseed} <br />\n`
     }
     else {
-      if (info.Name_Ch) 
+      if (info.Name_Ch != '') 
         content += `${info.Name_Ch} ${note} ${info.torrent_type}${reseed} <br />\n`
       content += `${info.Name_En} ${note} ${info.torrent_type}${reseed} <br />\n`
-      if (info.Name_Jp) 
-      content += `${info.Name_Jp} ${note} ${info.torrent_type}${reseed} <br />\n`
+      if (info.Name_Jp != '') 
+        content += `${info.Name_Jp} ${note} ${info.torrent_type}${reseed} <br />\n`
     }
     content += '<br />\n'
     if (info.sub_Ch && info.sub_Ch != '') {
@@ -1220,6 +1220,7 @@ async function createWithText(_event, id: number, config_: string) {
     fs.writeFileSync(result + '\\bangumi.html', html)
     fs.writeFileSync(result + '\\nyaa.md', md)
     fs.writeFileSync(result + '\\acgrip.bbcode', bbcode)
+    fs.copyFileSync(config.torrent, result + '\\' + config.torrent.replace(/^.*[\\\/]/, ''))
     return 'success'
   } catch (err) {
     dialog.showErrorBox('错误', (err as Error).message)
@@ -1446,21 +1447,16 @@ async function getSiteInfo(_event, id: number) {
       !storage.acgnx_g && 
       !storage.acgnx_a
     ){
-      let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
+      let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/')[1]}, { responseType: 'json' })
       for (let index = 0; index < 5; index++) {
-        if (response.status == 200 && 
-          response.data.sync.acgnx && 
-          response.data.sync.acgnx_int && 
-          response.data.sync.acgrip && 
-          response.data.sync.dmhy
-        ){ 
+        if (response.status == 200 && 'sync' in response.data){ 
           storage.sync = false
           break
         }
         await sleep(1000)
         response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
       }
-      if (storage.sync) 
+      if (!storage.sync) 
       {
         if (response.data.sync.acgnx != '已存在相同的种子'){
           storage.acgnx_a = response.data.sync.acgnx
@@ -1514,7 +1510,7 @@ async function getSiteInfo(_event, id: number) {
       if (note != '')
           note = note.slice(0, -2)
       if (info.reseed)
-          note += 'Reseed Fin'
+          note += `Reseed${info.rs_version > 1 ? ` v${info.rs_version}` : ''} Fin`
       else
           note += 'Fin'
       let title = `${info.Name_En}${info.Name_Ch == '' ? '' : ' / ' +  info.Name_Ch} ${info.bit} ${info.resolution} ` 
@@ -1572,9 +1568,18 @@ async function getSiteInfo(_event, id: number) {
       content += '\n[/box]\n\n'
       if (info.reseed) 
         content += '<hr />\n\n请将旧链放于此\n\n'
+      if (info.imageCredit != '') {
+        content += `Image Credit: <a href="${info.imageCredit}" rel="noopener" target="_blank">${info.imageLinks}</a>\n\n`
+      }
       content += '<label for="medie-info-switch" class="btn btn-inverse-primary" title="展开MediaInfo">MediaInfo</label>\n\n'
-      content += '<pre class="js-medie-info-detail medie-info-detail" style="display: none">\n请将MediaInfo放置于此\n</pre>'
+      content += '<pre class="js-medie-info-detail medie-info-detail" style="display: none">\n'
+      if (info.mediaInfo == '') 
+        content += '请将MediaInfo放置于此'
+      else 
+        content += info.mediaInfo
+      content += '\n</pre>'
       result.push(content)
+      result.push(info.imageSrc!)
       return result
     }
   }
@@ -1700,6 +1705,7 @@ app.whenReady().then(async () => {
   await db.write()
   //响应通信
   ipcMain.handle('openFile', handleFileOpen)
+  ipcMain.handle('openDirectory', openDirectory)
   ipcMain.handle('createTask', createTask)
   ipcMain.handle("createWithFile", createWithFile)
   ipcMain.handle("createWithText", createWithText)

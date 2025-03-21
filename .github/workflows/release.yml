@@ -1,11 +1,6 @@
 name: 构建并发布Release
 
 on: 
-  push:
-    branches:
-      - "main"
-    tags:
-      - "v*.*.*"
   workflow_dispatch: 
 
 jobs:

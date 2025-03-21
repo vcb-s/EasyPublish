@@ -10,7 +10,6 @@ declare module 'vue' {
     Check: typeof import('./src/components/Check.vue')['default']
     Create: typeof import('./src/components/Create.vue')['default']
     Edit: typeof import('./src/components/Edit.vue')['default']
-    ElAlert: typeof import('element-plus/es')['ElAlert']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElButton: typeof import('element-plus/es')['ElButton']
     ElButtonGroup: typeof import('element-plus/es')['ElButtonGroup']

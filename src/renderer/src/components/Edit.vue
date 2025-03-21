@@ -39,7 +39,6 @@ const steps = [
 
 <template>
     <div>
-        <!-- 占行 -->
         <el-row style="height: 20px;" />
         <el-row justify="space-between">
             <el-col :span="3" />

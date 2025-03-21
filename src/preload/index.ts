@@ -6,6 +6,7 @@ import type { PublishConfig} from '../renderer/src/index.d.ts'
 const api = {
   WinHandle: (command: string) => ipcRenderer.send("WinHandle", command) , 
   OpenFile: async (type: string) => await ipcRenderer.invoke('openFile', type) , 
+  OpenDirectory: async (path: string) => await ipcRenderer.invoke('openDirectory', path) , 
   GetProxyConfig: async () => await ipcRenderer.invoke('getProxyConfig'), 
   SetProxyConfig: (config: string) => ipcRenderer.send('setProxyConfig', config), 
   CreateTask: async (path: string, config: PublishConfig) => await ipcRenderer.invoke('createTask', path, config) ,

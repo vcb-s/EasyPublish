@@ -16,6 +16,7 @@ export interface Content_text {
   audio_En?: string
   comment_Ch: string
   comment_En: string
+  rs_version: number
   rs_comment_Ch?: string
   rs_comment_En?: string
   subTeam_Ch?: string[]
@@ -32,6 +33,10 @@ export interface Content_text {
   pictures_md?: string
   pictures_bbcode?: string
   picture_path: string
+  mediaInfo?: string
+  imageCredit?: string
+  imageLinks?: string
+  imageSrc?: string
 }
 
 export interface Content_file {
@@ -80,6 +85,14 @@ export interface Message_TaskInfo {
   id: number
   name: string
   path: string
+  bangumi?: string
+  nyaa?: string
+  acgrip?: string
+  dmhy?: string
+  acgnx_g?: string
+  acgnx_a?: string
+  site?: string
+  sync: boolean
   status: 'published' | 'publishing'
   step: 'create' | 'check' | 'publish' | 'site' | 'finish'
 }
