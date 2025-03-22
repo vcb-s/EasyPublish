@@ -246,7 +246,7 @@ async function BTPublish(_event, id: number, type: string) {
         await sleep(1000)
         let result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
         for (let index = 0; index < 5; index++) {
-          if (result.status == 200 && 'sync' in result.data){ 
+          if (result.status == 200 && result.data.sync){ 
             storage.sync = false
             await db.write()
             break
@@ -1449,7 +1449,7 @@ async function getSiteInfo(_event, id: number) {
     ){
       let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/')[1]}, { responseType: 'json' })
       for (let index = 0; index < 5; index++) {
-        if (response.status == 200 && 'sync' in response.data){ 
+        if (response.status == 200 && response.data.sync){ 
           storage.sync = false
           break
         }
