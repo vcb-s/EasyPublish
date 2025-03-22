@@ -13,6 +13,7 @@ export interface IElectronAPI {
   GetProxyConfig: () => Promise<string>,
   SetProxyConfig: (config: string) => void,
   OpenFile: (type: string) => Promise<string>,
+  OpenDirectory: (path: string) => Promise<string>,
   CreateWithFile: (id: number, config: string) => Promise<string>,
   CreateWithText: (id: number, config: string) => Promise<string>,
   SaveContent: (id: number, config: string) => Promise<string>,

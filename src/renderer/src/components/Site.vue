@@ -34,10 +34,11 @@
     const title = ref<string>('')
     const imgsrc = ref<string>('')
     const category = ref<number[]>([])
-    const credit_name = ref('')
-    const credit_link = ref('')
-    const mediaInfo = ref('')
-    const oldLinks = ref('')
+    const credit_name = ref<string>('')
+    const credit_link = ref<string>('')
+    const mediaInfo = ref<string>('')
+    const oldLinks = ref<string>('')
+    const oldComment = ref<string>('')
     const options = [
         {
             label: '1080p Full HD',
@@ -74,6 +75,10 @@
     function addLinks() {
         content.value = content.value.replace('请将旧链放于此', oldLinks.value)
     }
+    //添加过往修正
+    function addComments() {
+        content.value = content.value.replace(/(\[box\sstyle="info"\][\s\S]*?重发修正[\s\S]*?\[\/box\])/, '$1\n\n' + oldComment.value)
+    }
 
     //RS搜索文章
     async function searchPosts() {
@@ -91,6 +96,8 @@
             if (credit)
                 [,credit_link.value,credit_name.value] = credit
             let links = raw.match(/\[box\sstyle="download"\][\s\S]*?\[\/box\]/g)
+            let comments = raw.match(/\[box\sstyle="info"\][\s\S]*?重发修正[\s\S]*?\[\/box\]/g)
+            oldComment.value = ''
             oldLinks.value = ''
             if (links) {
                 links.forEach((_item, index) => {
@@ -99,7 +106,13 @@
                     if (index < links.length - 1)
                         oldLinks.value += '\n\n'
                 });
-                
+            }
+            if (comments) {
+                comments.forEach((_item, index) => {
+                    oldComment.value += comments[index]
+                    if (index < comments.length - 1)
+                        oldComment.value += '\n\n'
+                });
             }
         }
         else {
@@ -146,7 +159,7 @@
         if (result == 'empty')
             ElMessage.error('标题或内容为空')
         else if (result == 'unauthorized') 
-            ElMessage.error('账号密码错误')
+            ElMessage.error('认证失败，请检查账号密码')
         else if (result == 'failed')
             ElMessage.error('发布失败，详见日志')
         else if (result == 'noSuchFile_webp')
@@ -172,6 +185,7 @@
         publishInfo.value = result.slice(0, 6)
         if (result[6] != '') title.value = result[6]
         if (result[7] != '') content.value = result[7]
+        if (result[8] != '') imgsrc.value = result[8]
     }
 
     //右键复制事件
@@ -297,6 +311,16 @@
                                     placeholder="请填写旧链"
                                 />
                                 <el-button style="margin-top: 20px;" @click="addLinks()">添加旧链</el-button>
+                            </div>
+                            <h3 v-if="isRS">过往修正：</h3>
+                            <div v-if="isRS">
+                                <el-input
+                                    v-model="oldComment"
+                                    :autosize="{minRows:10}"
+                                    type="textarea"
+                                    placeholder="填写过往修正"
+                                />
+                                <el-button style="margin-top: 20px;" @click="addComments()">添加过往修正</el-button>
                             </div>
                         </el-collapse-item>
                     </el-collapse>

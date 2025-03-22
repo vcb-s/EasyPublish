@@ -248,9 +248,6 @@
                         <el-table-column prop="status" label="状态" width="220" />
                     </el-table>
                     <el-row style="height: 20px;" />
-                    <el-alert title="提示" 
-                    description="末日动漫会搬运萌番组和Nyaa，若有单发需要请注意顺序"
-                    type="info" />
                 </el-col>
                 <el-col :span="3" />
             </el-row>

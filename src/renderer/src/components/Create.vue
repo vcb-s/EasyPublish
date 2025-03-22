@@ -1,5 +1,5 @@
 <script setup lang="ts" name="Create">
-    import { defineProps, onMounted, ref, reactive } from "vue"
+    import { defineProps, onMounted, ref, reactive, computed } from "vue"
     import type { PublishConfig, Content_text } from '../index.d.ts'
     import { useRouter } from 'vue-router'
     import type { FormRules } from 'element-plus'
@@ -23,6 +23,7 @@
     const createForm_file = ref()
     const createForm_text = ref()
     const url_type = ref('html')
+    const prefill = ref(false)
     const type = ref(true)
     interface ruleForm {
         type: string,
@@ -33,6 +34,7 @@
         Name_Jp: string,
         comment_Ch: string
         comment_En: string
+        rs_version: number
         rs_comment_Ch: string
         rs_comment_En: string
         information: string,
@@ -67,7 +69,11 @@
         path_bbcode: string, 
         title: string,
         completed?: boolean,
-        remake?: boolean
+        remake?: boolean,
+        mediaInfo?: string,
+        imageCredit?: string,
+        imageLinks?: string,
+        imageSrc?: string
     }
     const config = reactive<ruleForm>({
         type: "file",
@@ -98,6 +104,7 @@
         path_html: '',
         path_bbcode: '',
         title: '',
+        rs_version: 1,
         rs_comment_Ch: "",
         rs_comment_En: "",
         pictures_md: "",
@@ -110,7 +117,11 @@
         audio_En: "",
         subTeam_Ch: [],
         subTeam_En: [],
-        providers: ""
+        providers: "",
+        mediaInfo: '',
+        imageCredit: '',
+        imageLinks: '',
+        imageSrc: ''
     })
     const rules = reactive<FormRules<ruleForm>>({
         Name_Ch: [{
@@ -519,21 +530,22 @@
             value: string
         }
     }
-    let suggestedBangumiTags: TagOptions[] = []
-    let inputBangumiTags: TagOptions[] = []
-    const BangumiTags = ref<TagOptions[]>([])
+    let suggestedBangumiTags = ref<TagOptions[]>([])
+    let inputBangumiTags = ref<TagOptions[]>([])
+    const BangumiTags = computed(() => {
+        return suggestedBangumiTags.value.concat(inputBangumiTags.value)
+    })
     async function getBangumiTags() {
         if (!remoteSearchEnable.value) 
             return
-        let { title } = await generateConfig()
+        let title = generateTitle()
         const {data, status} = await window.api.GetBangumiTags(type ? config.title : title)
         if (status == 200) {
-            suggestedBangumiTags = []
+            suggestedBangumiTags.value = []
             for (let item of data) {
                 if (item.type != 'misc') 
-                    suggestedBangumiTags.push({label: item.name, value: {label: item.name ,value: item._id}})
+                    suggestedBangumiTags.value.push({label: item.name, value: {label: item.name ,value: item._id}})
             }
-            BangumiTags.value = suggestedBangumiTags.concat(inputBangumiTags)
         }
         else if (status == 0) {
             ElMessage.error('请求Bangumi标签建议错误，错误信息详见日志')
@@ -547,12 +559,11 @@
             return
         const {data, status} = await window.api.SearchBangumiTags(query)
         if (status == 200) {
-            inputBangumiTags = []
+            inputBangumiTags.value = []
             if (data.success) {
                 for (const item of data.tag) {
-                    if (item.type != 'misc') inputBangumiTags.push({label: item.name, value: {label: item.name ,value: item._id}})
+                    if (item.type != 'misc') inputBangumiTags.value.push({label: item.name, value: {label: item.name ,value: item._id}})
                 }
-                BangumiTags.value = suggestedBangumiTags.concat(inputBangumiTags)
             }
         } 
         else if (status == 0) {
@@ -572,9 +583,39 @@
         else if (type == 'md') config.path_md = file
         else if (type == 'html') config.path_html = file
         else if (type == 'bbcode') config.path_bbcode = file
+        else if (type == 'webp') config.imageSrc = file
         isLoading.value = false
     }
 
+    //生成标题
+    function generateTitle() {
+        let team = '', note = ''
+        if (config.subTeam_Ch)
+            config.subTeam_Ch.forEach(item => { team += item + '&' })
+        team += 'VCB-Studio'
+        if (config.note)
+            config.note.forEach(item => { note += item + ' + ' })
+        if (note != '')
+            note = note.slice(0, -2)
+        if (config.reseed)
+            note += `Reseed${config.rs_version > 1 ? ` v${config.rs_version}` : ''} Fin`
+        else
+            note += 'Fin'
+        let title = `[${team}] `
+        if (config.Name_Ch != '') 
+            title += config.Name_Ch.trim() + ' / '
+        title += config.Name_En.trim() + ' '
+        if (config.Name_Jp != '') 
+            title += '/ ' + config.Name_Jp.trim() + ' '
+        title += `${config.bit} ${config.resolution} ${config.encoding} ${config.torrent_type} [${note}]` 
+        if (title.length > 128)
+            title = `[${team}] ${config.Name_Ch == '' ? '' : config.Name_Ch.trim() + ' / '}${config.Name_En.trim()}` 
+                    + ` ${config.bit} ${config.resolution} ${config.encoding} ${config.torrent_type} [${note}]`
+        if (title.length > 128)
+            title = `[${team}] ${config.Name_En.trim()} ${config.bit} ${config.resolution} ` 
+                    + `${config.encoding} ${config.torrent_type} [${note}]`
+        return title
+    }
     //生成发布配置
     async function generateConfig() {
         if (type.value) {
@@ -598,46 +639,27 @@
             return publishConfig
         }
         else {
-            let team = '', note = ''
-            if (config.subTeam_Ch)
-                config.subTeam_Ch.forEach(item => { team += item + '&' })
-            team += 'VCB-Studio'
-            if (config.note)
-                config.note.forEach(item => { note += item + ' + ' })
-            if (note != '')
-                note = note.slice(0, -2)
-            if (config.reseed)
-                note += 'Reseed Fin'
-            else
-                note += 'Fin'
-            let title = `[${team}] `
-            if (config.Name_Ch != '') 
-                title += config.Name_Ch + ' / '
-            title += config.Name_En + ' '
-            if (config.Name_Jp != '') 
-                title += '/ ' + config.Name_Jp + ' '
-            title += `${config.bit} ${config.resolution} ${config.encoding} ${config.torrent_type} [${note}]` 
-            if (title.length > 128)
-                title = `[${team}] ${config.Name_Ch == '' ? '' : config.Name_Ch + ' / '}${config.Name_En} ${config.bit}` 
-                      + ` ${config.resolution} ${config.encoding} ${config.torrent_type} [${note}]`
-            if (title.length > 128)
-                title = `[${team}] ${config.Name_En} ${config.bit} ${config.resolution} ` 
-                      + `${config.encoding} ${config.torrent_type} [${note}]`
+            if (!prefill.value) {
+                config.imageCredit = ''
+                config.imageLinks = ''
+                config.imageSrc = ''
+                config.mediaInfo = ''
+            }
             let publishConfig: PublishConfig = {
                 type: 'text',
                 name: '',
                 torrent: config.torrent,
-                information: config.information,
+                information: config.information.trim(),
                 category_bangumi: config.category_bangumi,
                 category_nyaa: config.category_nyaa,
                 tag: config.tag,
                 completed: config.completed,
                 remake: config.remake,
-                title: title,
+                title: generateTitle(),
                 content: {
-                    Name_Ch: config.Name_Ch,
-                    Name_En: config.Name_En,
-                    Name_Jp: config.Name_Jp,
+                    Name_Ch: config.Name_Ch.trim(),
+                    Name_En: config.Name_En.trim(),
+                    Name_Jp: config.Name_Jp.trim(),
                     bit: config.bit,
                     resolution: config.resolution,
                     encoding: config.encoding,
@@ -645,28 +667,33 @@
                     reseed: config.reseed,
                     nomination: config.nomination,
                     note: config.note,
-                    sub_Ch: config.sub_Ch,
-                    sub_En: config.sub_En,
-                    audio_Ch: config.audio_Ch,
-                    audio_En: config.audio_En,
-                    comment_Ch: config.comment_Ch,
-                    comment_En: config.comment_En,
-                    rs_comment_Ch: config.rs_comment_Ch,
-                    rs_comment_En: config.rs_comment_En,
+                    sub_Ch: config.sub_Ch.trim(),
+                    sub_En: config.sub_En.trim(),
+                    audio_Ch: config.audio_Ch.trim(),
+                    audio_En: config.audio_En.trim(),
+                    comment_Ch: config.comment_Ch.trim(),
+                    comment_En: config.comment_En.trim(),
+                    rs_version: config.rs_version,
+                    rs_comment_Ch: config.rs_comment_Ch.trim(),
+                    rs_comment_En: config.rs_comment_En.trim(),
                     subTeam_Ch: config.subTeam_Ch,
                     subTeam_En: config.subTeam_En,
-                    nonsense: config.nonsense,
+                    nonsense: config.nonsense.trim(),
                     members: {
                         script: config.script,
                         encode: config.encode,
                         collate: config.collate,
                         upload: config.upload
                     },
-                    providers: config.providers,
+                    providers: config.providers.trim(),
                     pictures_html: config.pictures_html,
                     pictures_md: config.pictures_md,
                     pictures_bbcode: config.pictures_bbcode,
-                    picture_path: config.picture_path
+                    picture_path: config.picture_path,
+                    mediaInfo: config.mediaInfo,
+                    imageCredit: config.imageCredit,
+                    imageLinks: config.imageLinks,
+                    imageSrc: config.imageSrc
                 }
             }
             return publishConfig
@@ -963,11 +990,35 @@
                             <el-form-item label="RS选项">
                                 <el-checkbox label="该项目为Reseed项目" v-model="config.reseed" />
                             </el-form-item>
+                            <el-form-item label="主站预填写">
+                                <el-checkbox label="预填写主站MediaInfo、发布图和署名" v-model="prefill" />
+                            </el-form-item>
+                            <el-form-item v-if="config.reseed" label="RS版本">
+                                <el-input-number v-model="config.rs_version" />
+                            </el-form-item>
                             <el-form-item v-if="config.reseed" label="中文修正" :rules="{required: config.reseed, message: '请填写重发修正', trigger: 'change'}">
                                 <el-input v-model="config.rs_comment_Ch" type="textarea" :autosize="{minRows: 2}" :placeholder="'1. XXXXXX；\n2. XXXXXX。'" />
                             </el-form-item>
                             <el-form-item v-if="config.reseed" label="英文修正" :rules="{required: config.reseed, message: '请填写重发修正', trigger: 'change'}">
                                 <el-input v-model="config.rs_comment_En" type="textarea" :autosize="{minRows: 2}" :placeholder="'1. XXXXXX;\n2. XXXXXX.'" />
+                            </el-form-item>
+                            <el-form-item v-if="prefill" label="发布图署名">
+                                <el-input v-model="config.imageCredit" placeholder="填写Image Credit" style="width:200px" />
+                            </el-form-item>
+                            <el-form-item v-if="prefill" label="原图链接">
+                                <el-input v-model="config.imageLinks" placeholder="填写Credit链接" />
+                            </el-form-item>
+                            <el-form-item v-if="prefill" label="发布图链接">
+                                <el-input v-model="config.imageSrc" placeholder="填写发布图链接">
+                                    <template #append>
+                                        <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
+                                            <el-icon><FolderOpened /></el-icon>
+                                        </el-button>
+                                    </template>
+                                </el-input>
+                            </el-form-item>
+                            <el-form-item v-if="prefill" label="MediaInfo">
+                                <el-input v-model="config.mediaInfo" type="textarea" :autosize="{minRows: 10}" placeholder="填写MediaInfo" />
                             </el-form-item>
                             <el-form-item label="参与制作" prop="script">
                                 <el-row>
@@ -1035,7 +1086,7 @@
                                 <el-select-v2
                                     v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
-                                    :remote-method="searchBangumiTags" :loading="isSearching"
+                                    :remote-method="searchBangumiTags" :loading="isSearching" @focus="$forceUpdate()"
                                 />
                             </el-form-item>
                             <el-form-item label="Bangumi分类" prop="category_bangumi">
@@ -1102,7 +1153,7 @@
                                 <el-select-v2
                                     v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
-                                    :remote-method="searchBangumiTags" :loading="isSearching"
+                                    :remote-method="searchBangumiTags" :loading="isSearching" @focus="$forceUpdate()"
                                 />
                             </el-form-item>
                             <el-form-item label="Bangumi分类" prop="category_bangumi">
