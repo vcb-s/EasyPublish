@@ -1,5 +1,5 @@
 <script lang="ts" name="Localtask" setup>
-    import { ref, reactive, onMounted } from "vue";
+    import { ref, reactive, onMounted, computed } from "vue";
     import { useRouter } from 'vue-router'
 
     //设置滚动条区域高度
@@ -29,14 +29,20 @@
         acgnx_g?: string,
         isFinished: string,
     }
-    const tabledata = reactive<Tabledata[]>([])
+    const incomplete = ref(false)
+    const data = reactive<Tabledata[]>([])
+    const tabledata = computed(() => {
+        if (incomplete.value)
+            return data
+        return data.filter((item) => item.isFinished == "publishing")
+    })
 
     //跳转发布页面
     const router = useRouter()
-    function toPublish(index: number) {
+    function toPublish(id: number) {
         router.push({
-            name: tabledata[index].step,
-            params: {id: tabledata[index].id}
+            name: data.find((item) => item.id == id)!.step,
+            params: {id: id}
         })
     }
 
@@ -47,7 +53,7 @@
 
     //加载数据
     async function loadData() {
-        tabledata.length = 0
+        data.length = 0
         const taskInfo = await window.api.GetAllTask()
         taskInfo.forEach((value) => {
             let str: string
@@ -57,7 +63,7 @@
             else if (value.step == 'site') str = '主站发布阶段'
             else str = '发布完成'
             if (value.status == 'published') str = '发布完成'
-            tabledata.push({
+            data.push({
                 id: value.id,
                 name: value.name,
                 path: value.path,
@@ -76,8 +82,8 @@
     window.api.RefreshTaskData(loadData)
 
     //删除任务
-    function remove(index: number) {
-        window.api.RemoveTask(tabledata[index].id)
+    function remove(id: number) {
+        window.api.RemoveTask(id)
     }
 
     //右键复制事件
@@ -106,11 +112,13 @@
             <el-row justify="space-between">
                 <el-col :span="3" />
                 <el-col :span="18">
-                    <el-table style="width: 100%;" :data="tabledata">
+                    <el-checkbox label="显示已完成项目" v-model="incomplete" />
+                    <el-row style="height: 10px;" />
+                    <el-table style="width: 100%; height: 100%" :data="tabledata">
                         <el-table-column fixed="right" label="发布" width="80">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" 
-                                @click="toPublish(scope.$index)">
+                                @click="toPublish(scope.row.id)">
                                     继续发布
                                 </el-button>
                             </template>
@@ -126,7 +134,7 @@
                         <el-table-column fixed="right" label="删除" width="80">
                             <template #default="scope">
                                 <el-button link type="danger" size="small" 
-                                @click="remove(scope.$index)">
+                                @click="remove(scope.row.id)">
                                     删除
                                 </el-button>
                             </template>
@@ -140,12 +148,12 @@
                                     <el-col :span="1" />
                                     <el-col :span="22">
                                         <p @contextmenu.prevent="handleRightClick(props.row.path)">项目地址：{{props.row.path}}</p>
-                                        <p @contextmenu.prevent="handleRightClick(props.row.bangumi)">萌番组：{{props.row.bangumi}}</p>
-                                        <p @contextmenu.prevent="handleRightClick(props.row.nyaa)">Nyaa：{{props.row.nyaa}}</p>
-                                        <p @contextmenu.prevent="handleRightClick(props.row.acgrip)">Acgrip：{{props.row.acgrip}}</p>
-                                        <p @contextmenu.prevent="handleRightClick(props.row.dmhy)">动漫花园：{{props.row.dmhy}}</p>
-                                        <p @contextmenu.prevent="handleRightClick(props.row.acgnx_a)">末日动漫：{{props.row.acgnx_a}}</p>
-                                        <p @contextmenu.prevent="handleRightClick(props.row.acgnx_g)">AcgnX：{{props.row.acgnx_g}}</p>
+                                        <p @contextmenu.prevent="handleRightClick(props.row.bangumi)">萌番组：<a :href="props.row.bangumi">{{props.row.bangumi}}</a></p>
+                                        <p @contextmenu.prevent="handleRightClick(props.row.nyaa)">Nyaa：<a :href="props.row.nyaa">{{props.row.nyaa}}</a></p>
+                                        <p @contextmenu.prevent="handleRightClick(props.row.acgrip)">Acgrip：<a :href="props.row.acgrip">{{props.row.acgrip}}</a></p>
+                                        <p @contextmenu.prevent="handleRightClick(props.row.dmhy)">动漫花园：<a :href="props.row.dmhy">{{props.row.dmhy}}</a></p>
+                                        <p @contextmenu.prevent="handleRightClick(props.row.acgnx_a)">末日动漫：<a :href="props.row.acgnx_a">{{props.row.acgnx_a}}</a></p>
+                                        <p @contextmenu.prevent="handleRightClick(props.row.acgnx_g)">AcgnX：<a :href="props.row.acgnx_g">{{props.row.acgnx_g}}</a></p>
                                     </el-col>
                                     <el-col :span="1" />
                                 </el-row>
@@ -155,6 +163,7 @@
                 </el-col>
                 <el-col :span="3" />
             </el-row>
+            <el-row style="height: 20px;" />
         </el-scrollbar>
     </div>
 </template>

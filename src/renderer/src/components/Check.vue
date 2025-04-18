@@ -140,7 +140,7 @@
                             </el-button-group>
                         </span>
                     </div>
-                    <el-input v-model="title" style="margin-top: 20px;" />
+                    <el-input v-model="title" style="margin-top: 20px;" maxlength="128" show-word-limit/>
                 </el-col>
                 <el-col :span="3" />
             </el-row>

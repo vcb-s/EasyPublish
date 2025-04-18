@@ -28,6 +28,7 @@ const api = {
   GetAllTask: async () => await ipcRenderer.invoke('getAllTask'),
   GetPublishInfo: async (id: number) => await ipcRenderer.invoke('getPublishInfo', id),
   GetSiteInfo: async (id: number) => await ipcRenderer.invoke('getSiteInfo', id),
+  GetBTLinks: async (id: number) => await ipcRenderer.invoke('getBTLinks', id), 
   CheckAccount: async (type: string) => await ipcRenderer.invoke('checkAcount', type),
   ReadFileContent: async () => await ipcRenderer.invoke('readFileContent'),
   SetSiteUAP: async (op: boolean, username: string, password: string) => await ipcRenderer.invoke('setSiteUAP', op, username, password),
