@@ -37,6 +37,7 @@ export interface Content_text {
   imageCredit?: string
   imageLinks?: string
   imageSrc?: string
+  prefill: boolean
 }
 
 export interface Content_file {

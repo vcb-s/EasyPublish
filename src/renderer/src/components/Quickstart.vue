@@ -1,14 +1,16 @@
 <script lang="ts" setup name="Quickstart">
-
+import { useDark } from '@vueuse/core'
+const isDark = useDark()
 </script>
 
 <template>
 <div style="margin-left: 20px;">
-    <div style="width: 380px;">
-        <img src="../assets/icon.png" />
+    <div style="width: 500px;">
+        <img v-if="isDark" src="../assets/logo_dark.png" />
+        <img v-else src="../assets/logo.png" />
     </div>
     <br />
-    当前版本：1.1.1<br />
+    当前版本：1.1.2<br />
     项目地址：<a href="https://github.com/vcb-s/EasyPublish/tree/main">https://github.com/vcb-s/EasyPublish/tree/main</a><br />
     这个快速开始让我吃了，去项目页看吧。
 </div>

@@ -23,7 +23,6 @@
     const createForm_file = ref()
     const createForm_text = ref()
     const url_type = ref('html')
-    const prefill = ref(false)
     const type = ref(true)
     interface ruleForm {
         type: string,
@@ -73,7 +72,8 @@
         mediaInfo?: string,
         imageCredit?: string,
         imageLinks?: string,
-        imageSrc?: string
+        imageSrc?: string,
+        prefill: boolean
     }
     const config = reactive<ruleForm>({
         type: "file",
@@ -83,19 +83,19 @@
         Name_En: "",
         Name_Jp: "",
         information: '',
-        bit: "",
+        bit: "10-bit",
         picture_path: '',
         nomination: false,
         reseed: false,
-        resolution: "",
-        encoding: "",
+        resolution: "1080p",
+        encoding: "HEVC",
         comment_Ch: '',
         comment_En: '',
         script: '',
         encode: '',
         collate: '',
         upload: '',
-        torrent_type: "",
+        torrent_type: "BDRip",
         note: [],
         category_bangumi: "",
         category_nyaa: "",
@@ -121,7 +121,8 @@
         mediaInfo: '',
         imageCredit: '',
         imageLinks: '',
-        imageSrc: ''
+        imageSrc: '',
+        prefill: false
     })
     const rules = reactive<FormRules<ruleForm>>({
         Name_Ch: [{
@@ -639,7 +640,7 @@
             return publishConfig
         }
         else {
-            if (!prefill.value) {
+            if (!config.prefill) {
                 config.imageCredit = ''
                 config.imageLinks = ''
                 config.imageSrc = ''
@@ -693,7 +694,8 @@
                     mediaInfo: config.mediaInfo,
                     imageCredit: config.imageCredit,
                     imageLinks: config.imageLinks,
-                    imageSrc: config.imageSrc
+                    imageSrc: config.imageSrc,
+                    prefill: config.prefill
                 }
             }
             return publishConfig
@@ -780,6 +782,7 @@
             }else {
                 ElMessage.error('请正确填写任务配置')
             }
+            isCreating.value = false
         })
     }
 
@@ -913,13 +916,13 @@
                         <!-- 从模板创建 -->
                         <el-form ref="createForm_text" :model="config" label-width="auto" style="max-width: 1050px;" :rules="rules">
                             <el-form-item label="中文标题" prop="Name_Ch">
-                                <el-input v-model="config.Name_Ch" placeholder="请填写中文标题" @blur="getBangumiTags()" />
+                                <el-input v-model="config.Name_Ch" placeholder="请填写中文标题" />
                             </el-form-item>
                             <el-form-item label="英文标题" prop="Name_En">
-                                <el-input v-model="config.Name_En" placeholder="请填写英文标题" @blur="getBangumiTags()" />
+                                <el-input v-model="config.Name_En" placeholder="请填写英文标题" />
                             </el-form-item>
                             <el-form-item label="日语标题" prop="Name_Jp">
-                                <el-input v-model="config.Name_Jp" placeholder="请填写日语标题" @blur="getBangumiTags()" />
+                                <el-input v-model="config.Name_Jp" placeholder="请填写日语标题" />
                             </el-form-item>
                             <el-form-item label="海报图链接" prop="picture_path">
                                 <el-input placeholder="请填写海报图链接" v-model="config.picture_path">
@@ -933,20 +936,20 @@
                                     />
                             </el-form-item>
                             <el-form-item label="位深" prop="bit">
-                                <el-select-v2 v-model="config.bit" allow-create :options="bitOptions" :reserve-keyword="false" 
-                                placeholder="请填写位深" style="width: 150px" @change="getBangumiTags()" filterable />
+                                <el-select-v2 v-model="config.bit" :options="bitOptions" :reserve-keyword="false" 
+                                placeholder="请填写位深" style="width: 150px" filterable allow-create />
                             </el-form-item>
                             <el-form-item label="分辨率" prop="resolution">
-                                <el-select-v2 v-model="config.resolution" allow-create :options="resolutionOptions" :reserve-keyword="false" 
-                                placeholder="请填写分辨率" style="width: 150px" @change="getBangumiTags()" filterable />
+                                <el-select-v2 v-model="config.resolution" :options="resolutionOptions" :reserve-keyword="false" 
+                                placeholder="请填写分辨率" style="width: 150px" filterable allow-create />
                             </el-form-item>
                             <el-form-item label="编码" prop="encoding">
-                                <el-select-v2 v-model="config.encoding" allow-create :options="encodingOptions" :reserve-keyword="false" 
-                                placeholder="请填写编码" style="width: 150px" @change="getBangumiTags()" filterable />
+                                <el-select-v2 v-model="config.encoding" :options="encodingOptions" :reserve-keyword="false" 
+                                placeholder="请填写编码" style="width: 150px" filterable allow-create />
                             </el-form-item>
                             <el-form-item label="类型" prop="torrent_type">
-                                <el-select-v2 v-model="config.torrent_type" allow-create :options="typeOptions" :reserve-keyword="false" 
-                                placeholder="请填写类型" style="width: 150px" @change="getBangumiTags()" filterable />
+                                <el-select-v2 v-model="config.torrent_type" :options="typeOptions" :reserve-keyword="false" 
+                                placeholder="请填写类型" style="width: 150px" filterable allow-create />
                             </el-form-item>
                             <el-form-item label="提名情况">
                                 <el-checkbox label="组员提名项目" v-model="config.nomination" border />
@@ -991,7 +994,7 @@
                                 <el-checkbox label="该项目为Reseed项目" v-model="config.reseed" />
                             </el-form-item>
                             <el-form-item label="主站预填写">
-                                <el-checkbox label="预填写主站MediaInfo、发布图和署名" v-model="prefill" />
+                                <el-checkbox label="预填写主站MediaInfo、发布图和署名" v-model="config.prefill" />
                             </el-form-item>
                             <el-form-item v-if="config.reseed" label="RS版本">
                                 <el-input-number v-model="config.rs_version" />
@@ -1002,13 +1005,13 @@
                             <el-form-item v-if="config.reseed" label="英文修正" :rules="{required: config.reseed, message: '请填写重发修正', trigger: 'change'}">
                                 <el-input v-model="config.rs_comment_En" type="textarea" :autosize="{minRows: 2}" :placeholder="'1. XXXXXX;\n2. XXXXXX.'" />
                             </el-form-item>
-                            <el-form-item v-if="prefill" label="发布图署名">
+                            <el-form-item v-if="config.prefill" label="发布图署名">
                                 <el-input v-model="config.imageCredit" placeholder="填写Image Credit" style="width:200px" />
                             </el-form-item>
-                            <el-form-item v-if="prefill" label="原图链接">
+                            <el-form-item v-if="config.prefill" label="原图链接">
                                 <el-input v-model="config.imageLinks" placeholder="填写Credit链接" />
                             </el-form-item>
-                            <el-form-item v-if="prefill" label="发布图链接">
+                            <el-form-item v-if="config.prefill" label="发布图链接">
                                 <el-input v-model="config.imageSrc" placeholder="填写发布图链接">
                                     <template #append>
                                         <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
@@ -1017,7 +1020,7 @@
                                     </template>
                                 </el-input>
                             </el-form-item>
-                            <el-form-item v-if="prefill" label="MediaInfo">
+                            <el-form-item v-if="config.prefill" label="MediaInfo">
                                 <el-input v-model="config.mediaInfo" type="textarea" :autosize="{minRows: 10}" placeholder="填写MediaInfo" />
                             </el-form-item>
                             <el-form-item label="参与制作" prop="script">
@@ -1086,7 +1089,7 @@
                                 <el-select-v2
                                     v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
-                                    :remote-method="searchBangumiTags" :loading="isSearching" @focus="$forceUpdate()"
+                                    :remote-method="searchBangumiTags" :loading="isSearching" @focus="getBangumiTags"
                                 />
                             </el-form-item>
                             <el-form-item label="Bangumi分类" prop="category_bangumi">
@@ -1108,7 +1111,7 @@
                         <!-- 从文件创建 -->
                         <el-form ref="createForm_file" :model="config" label-width="auto" style="max-width: 1050px;" :rules="rules">
                             <el-form-item label="标题" prop="title">
-                                <el-input v-model="config.title" placeholder="请填写标题" @blur="getBangumiTags()"/>
+                                <el-input v-model="config.title" placeholder="请填写标题"/>
                             </el-form-item>
                             <el-form-item label="种子文件路径" prop="torrent">
                                 <el-input placeholder="选择一个文件" v-model="config.torrent">
@@ -1153,7 +1156,7 @@
                                 <el-select-v2
                                     v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
-                                    :remote-method="searchBangumiTags" :loading="isSearching" @focus="$forceUpdate()"
+                                    :remote-method="searchBangumiTags" :loading="isSearching" @focus="getBangumiTags"
                                 />
                             </el-form-item>
                             <el-form-item label="Bangumi分类" prop="category_bangumi">

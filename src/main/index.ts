@@ -146,7 +146,7 @@ const defaultData: Data = { posts: [],
 let db: Low<Data>
 
 //等待
-function sleep(ms) {
+function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
@@ -1327,8 +1327,22 @@ async function saveFileContent(_event, id: number, type: string, content: string
 
 //保存代理设置
 async function setProxyConfig(_event, config: string) {
-  db.data.proxyConfig = JSON.parse(config)
+  let pconf = JSON.parse(config)
+  db.data.proxyConfig = pconf
   await db.write()
+  //配置axios代理
+  if (pconf.status) {
+    if (pconf.type == "socks") {
+      axios.defaults.httpsAgent = new socksProxy.SocksProxyAgent(`socks://${pconf.host}:${pconf.port}`)
+    }
+    else{
+      axios.defaults.proxy = {
+        protocol: pconf.type,
+        port: pconf.port,
+        host: pconf.host
+      }
+    }
+  }
 }
 
 //保存用户密码
@@ -1440,63 +1454,9 @@ async function getSiteInfo(_event, id: number) {
     storage.step = 'site'
     await db.write()
     let result: string[] = []
-    //若bangumi团队同步未完成则再次尝试获取各站链接
-    if (storage.sync && 
-      !storage.acgrip && 
-      !storage.dmhy && 
-      !storage.acgnx_g && 
-      !storage.acgnx_a
-    ){
-      let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/')[1]}, { responseType: 'json' })
-      for (let index = 0; index < 5; index++) {
-        if (response.status == 200 && response.data.sync){ 
-          storage.sync = false
-          break
-        }
-        await sleep(1000)
-        response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
-      }
-      if (!storage.sync) 
-      {
-        if (response.data.sync.acgnx != '已存在相同的种子'){
-          storage.acgnx_a = response.data.sync.acgnx
-        }
-        else{
-          if (!storage.acgnx_a)
-            storage.acgnx_a = '种子已存在'
-        }
-        if (response.data.sync.acgnx_int != '已存在相同的种子'){
-          storage.acgnx_g = response.data.sync.acgnx_int
-        }
-        else{
-          if (!storage.acgnx_g)
-            storage.acgnx_g = '种子已存在'
-        }
-        if (response.data.sync.acgrip != '已存在相同的种子'){
-          storage.acgrip = response.data.sync.acgrip
-        }
-        else{
-          if (!storage.acgrip)
-            storage.acgrip = '种子已存在'
-        }
-        if (response.data.sync.dmhy != '已存在相同的种子'){
-          storage.dmhy = response.data.sync.dmhy
-        }
-        else{
-          if (!storage.dmhy)
-            storage.dmhy = '种子已存在'
-        }
-      }
-      await db.write()
-    }
-    result.push('萌番组：' + (storage.bangumi ? storage.bangumi : ''))
-    result.push('Nyaa：' + (storage.nyaa ? storage.nyaa : ''))
-    result.push('Acgrip：' + (storage.acgrip ? storage.acgrip : ''))
-    result.push('动漫花园：' + (storage.dmhy ? storage.dmhy : ''))
-    result.push('Acgnx：' + (storage.acgnx_g ? storage.acgnx_g : ''))
-    result.push('末日动漫：' + (storage.acgnx_a ? storage.acgnx_a : ''))
     //从文件创建
     if (config.type == 'file') {
+      result.push('')
       result.push('')
       result.push('')
       return result
@@ -1547,25 +1507,7 @@ async function getSiteInfo(_event, id: number) {
       }
       content += '[box style="download"]\n'
       content += `${info.bit} ${info.resolution} ${info.encoding}${info.reseed ? ' (Reseed)' : ''}`
-      if (storage.bangumi && storage.bangumi != '') {
-        content += `\n\n<a href="${storage.bangumi}" rel="noopener" target="_blank">${storage.bangumi}</a>`
-      }
-      if (storage.acgnx_a && storage.acgnx_a != '') {
-        content += `\n\n<a href="${storage.acgnx_a}" rel="noopener" target="_blank">${storage.acgnx_a}</a>`
-      }
-      if (storage.acgnx_g && storage.acgnx_g != '') {
-        content += `\n\n<a href="${storage.acgnx_g}" rel="noopener" target="_blank">${storage.acgnx_g}</a>`
-      }
-      if (storage.acgrip && storage.acgrip != '') {
-        content += `\n\n<a href="${storage.acgrip}" rel="noopener" target="_blank">${storage.acgrip}</a>`
-      }
-      if (storage.dmhy && storage.dmhy != '') {
-        content += `\n\n<a href="${storage.dmhy}" rel="noopener" target="_blank">${storage.dmhy}</a>`
-      }
-      if (storage.nyaa && storage.nyaa != '') {
-        content += `\n\n<a href="${storage.nyaa}" rel="noopener" target="_blank">${storage.nyaa}</a>`
-      }
-      content += '\n[/box]\n\n'
+      content += '\n\n链接加载中[/box]\n\n'
       if (info.reseed) 
         content += '<hr />\n\n请将旧链放于此\n\n'
       if (info.imageCredit != '') {
@@ -1582,6 +1524,80 @@ async function getSiteInfo(_event, id: number) {
       result.push(info.imageSrc!)
       return result
     }
+  }
+  catch (err) {
+    console.log(err)
+    dialog.showErrorBox('错误', (err as Error).message)
+    return []
+  }
+}
+//主站获取BT链接
+async function getBTLinks(_event, id: number) {
+  try {
+    let storage = db.data.posts.find(item => item.id == id)
+    if (storage == undefined) 
+      throw new Error('TaskNotFound:' + id)
+    if (!fs.existsSync(storage.path)) 
+      throw new Error('FolderNotFound:' + id)
+    storage.step = 'site'
+    await db.write()
+    let result: string[] = []
+    //若bangumi团队同步未完成则再次尝试获取各站链接
+    if (storage.sync && 
+      !storage.acgrip && 
+      !storage.dmhy && 
+      !storage.acgnx_g && 
+      !storage.acgnx_a
+    ){
+      let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/')[1]}, { responseType: 'json' })
+      for (let index = 0; index < 5; index++) {
+        if (response.status == 200 && response.data.sync){ 
+          storage.sync = false
+          break
+        }
+        await sleep(1000)
+        response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
+      }
+      if (!storage.sync) 
+      {
+        if (response.data.sync.acgnx != '已存在相同的种子'){
+          storage.acgnx_a = response.data.sync.acgnx
+        }
+        else{
+          if (!storage.acgnx_a)
+            storage.acgnx_a = '种子已存在'
+        }
+        if (response.data.sync.acgnx_int != '已存在相同的种子'){
+          storage.acgnx_g = response.data.sync.acgnx_int
+        }
+        else{
+          if (!storage.acgnx_g)
+            storage.acgnx_g = '种子已存在'
+        }
+        if (response.data.sync.acgrip != '已存在相同的种子'){
+          storage.acgrip = response.data.sync.acgrip
+        }
+        else{
+          if (!storage.acgrip)
+            storage.acgrip = '种子已存在'
+        }
+        if (response.data.sync.dmhy != '已存在相同的种子'){
+          storage.dmhy = response.data.sync.dmhy
+        }
+        else{
+          if (!storage.dmhy)
+            storage.dmhy = '种子已存在'
+        }
+      }
+      await db.write()
+    }
+    result.push(storage.bangumi ? storage.bangumi : '')
+    result.push(storage.nyaa ? storage.nyaa : '')
+    result.push(storage.acgrip ? storage.acgrip : '')
+    result.push(storage.dmhy ? storage.dmhy : '')
+    result.push(storage.acgnx_g ? storage.acgnx_g : '')
+    result.push(storage.acgnx_a ? storage.acgnx_a : '')
+    return result
   }
   catch (err) {
     console.log(err)
@@ -1627,7 +1643,6 @@ function writeClipboard(_event, str: string) {
 //主窗口
 let mainWindowWebContent: Electron.WebContents
 function createWindow(): void {
-  // Create the browser window.
 
   const mainWindow = new BrowserWindow({
     width: 1150,
@@ -1696,9 +1711,6 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(async () => {
   //设置应用数据库
   db = await JSONFilePreset<Data>(app.getPath('userData') + '\\easypublish-db.json', defaultData)
@@ -1720,6 +1732,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('getAllTask', _event => db.data.posts)
   ipcMain.handle('getPublishInfo', getPublishInfo)
   ipcMain.handle('getSiteInfo', getSiteInfo)
+  ipcMain.handle('getBTLinks', getBTLinks)
   ipcMain.handle('checkAcount', checkAccount)
   ipcMain.handle('readFileContent', readFileContent)
   ipcMain.handle('publish', BTPublish)

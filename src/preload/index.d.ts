@@ -36,6 +36,7 @@ export interface IElectronAPI {
   GetAllTask: () => Promise<Message_TaskInfo[]>
   GetPublishInfo: (id: number) => Promise<string>
   GetSiteInfo: (id: number) => Promise<string[]>
+  GetBTLinks: (id: number) => Promise<string[]>
   CheckAccount: (type: string) => Promise<string>
   ReadFileContent: () => Promise<string>
   SetSiteUAP: (op: boolean, username: string, password: string) => Promise<string[]>

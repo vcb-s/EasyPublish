@@ -61,7 +61,6 @@
         </el-switch>
         <div style="position: absolute; right: 140px;">
           <el-popover :visible="visible" :width="300">
-            <p>代理配置将在应用重启后生效</p>
             <el-form :model="form" label-width="auto" style="max-width: 300px">
               <el-form-item label="启用代理">
                 <el-switch v-model="form.status" />

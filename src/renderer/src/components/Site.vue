@@ -30,10 +30,11 @@
     const rsID = ref<number>(0)
     const tableData = ref<Tabledata[]>([])
     const publishInfo = ref<string[]>([])
+    const BTLinks = ref<string[]>([])
     const content = ref<string>('')
     const title = ref<string>('')
     const imgsrc = ref<string>('')
-    const category = ref<number[]>([])
+    const category = ref<number[]>([2, 21])
     const credit_name = ref<string>('')
     const credit_link = ref<string>('')
     const mediaInfo = ref<string>('')
@@ -78,6 +79,19 @@
     //添加过往修正
     function addComments() {
         content.value = content.value.replace(/(\[box\sstyle="info"\][\s\S]*?重发修正[\s\S]*?\[\/box\])/, '$1\n\n' + oldComment.value)
+    }
+
+    //整理BT链接
+    function generateLinks() {
+        let content: string = ''
+        for (let i = 0; i < 6; i++)
+            if (BTLinks.value[i] != '' && BTLinks.value[i] != '未找到链接')
+                content += `<a href=${BTLinks.value[i]}>${BTLinks.value[i]}</a>\n\n`
+        return content
+    }
+    //复制BT链接
+    function copyLinks() {
+        window.api.WriteClipboard(generateLinks())
     }
 
     //RS搜索文章
@@ -182,10 +196,25 @@
     //加载信息
     async function loadData() {
         const result = await window.api.GetSiteInfo(props.id)
-        publishInfo.value = result.slice(0, 6)
-        if (result[6] != '') title.value = result[6]
-        if (result[7] != '') content.value = result[7]
-        if (result[8] != '') imgsrc.value = result[8]
+        if (result[6] != '') title.value = result[0]
+        if (result[7] != '') content.value = result[1]
+        if (result[8] != '') imgsrc.value = result[2]
+    }
+    const loadingBT = ref(true)
+    async function loadBT() {
+        loadingBT.value = true
+        const result = await window.api.GetBTLinks(props.id)
+        BTLinks.value = result.slice(0, 6)
+        publishInfo.value = []
+        publishInfo.value.push('萌番组：' + result[0])
+        publishInfo.value.push('Nyaa：' + result[1])
+        publishInfo.value.push('Acgrip：' + result[2])
+        publishInfo.value.push('动漫花园：' + result[3])
+        publishInfo.value.push('Acgnx：' + result[4])
+        publishInfo.value.push('末日动漫：' + result[5])
+        content.value = content.value.replace('链接加载中', generateLinks())
+        loadingBT.value = false
+        ElMessage('加载完成')
     }
 
     //右键复制事件
@@ -194,9 +223,10 @@
         ElMessage('复制成功')
     }
 
-    onMounted(() => {
+    onMounted(async () => {
         setscrollbar()
-        loadData()
+        await loadData()
+        loadBT()
     })
 
 </script>
@@ -269,8 +299,9 @@
                         </el-form>
                     </div>
                     <el-collapse>
-                        <el-collapse-item title="BT链接">
-                            <el-link :underline="false" @click="loadData()" type="primary">刷新<el-icon><Refresh /></el-icon></el-link>
+                        <el-collapse-item v-loading="loadingBT" title="BT链接">
+                            <el-link :underline="false" @click="loadBT()" type="primary">刷新<el-icon><Refresh /></el-icon></el-link>
+                            <el-link :underline="false" @click="copyLinks()" type="primary" style="margin-left: 10px;">复制<el-icon><DocumentCopy /></el-icon></el-link>
                             <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
                         </el-collapse-item>
                         <el-collapse-item title="填写模板">

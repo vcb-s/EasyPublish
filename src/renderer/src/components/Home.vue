@@ -1,24 +1,25 @@
 <script setup lang="ts" name="Home">
-
+import { useDark } from '@vueuse/core'
+const isDark = useDark()
 </script>
 
 <template>
-    <div style="width: 380px;" class="home">
-        <img src="../assets/icon.png" /><br />
-        &emsp;欢迎使用EasyPublish
+    <div class="home">
+        <img v-if="isDark" src="../assets/logo_dark.png" />
+        <img v-else src="../assets/logo.png" />
     </div>
 </template>
 
 <style scoped>
 img{
-    width: 100%;
+    width: 800px;
     height: 100%;
     object-fit: cover;
 }
 .home{
     position: absolute;
     top: 20%;
-    left: 45%;
+    left: 25%;
     transform: translate(-50%、 -50%);
     text-align: center;
     font-size: xx-large;
