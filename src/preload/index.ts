@@ -38,8 +38,10 @@ const api = {
   GetSiteSrc: async (id: number) => await ipcRenderer.invoke('getSiteSrc', id),
   ClearStorage: () => ipcRenderer.send('clearStorage'),
   WriteClipboard: (str: string) => ipcRenderer.send('writeClipboard', str),
-  SearchPosts: (str: string) =>ipcRenderer.invoke("searchPosts", str),
-  LoadFromTxt: () =>ipcRenderer.invoke("loadFromTxt"),
+  SearchPosts: (str: string) => ipcRenderer.invoke("searchPosts", str),
+  LoadFromTxt: () => ipcRenderer.invoke("loadFromTxt"),
+  ExportCookies: (type: number) => ipcRenderer.send('exportCookies', type),
+  ImportCookies: (type: number) => ipcRenderer.send('importCookies', type),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

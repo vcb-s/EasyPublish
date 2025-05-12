@@ -103,6 +103,18 @@
 <template>
     <div :style="{height: slbHeight}">
         <el-scrollbar style="height: 100%;">
+            <el-row>
+                <el-col :span="3" />
+                <el-col :span="18">
+                    <span style="float: left">
+                        <el-link :underline="false" @click="toCreate" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
+                    </span>
+                    <span style="float: right">
+                        <el-link :underline="false" @click="toPublish" type="primary">下一步<el-icon><ArrowRight /></el-icon></el-link>
+                    </span>
+                </el-col>
+                <el-col :span="3" />
+            </el-row>
             <el-row style="height: 20px;" />
             <el-row style="font-size: xx-large; height: 43px; ">
                 <el-col :span="3" />

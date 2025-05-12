@@ -65,15 +65,18 @@
 
     //添加Credit信息
     function addCredit() {
+        if (credit_link.value == '') return
         let credit = `Image Credit: <a href="${credit_link.value}" rel="noopener" target="_blank">${credit_name.value}</a>\n\n<label`
         content.value = content.value.replace('<label', credit)
     }
     //添加MediaInfo
     function addMediaInfo() {
+        if (mediaInfo.value == '') return
         content.value = content.value.replace('请将MediaInfo放置于此', mediaInfo.value)
     }
     //添加旧链
     function addLinks() {
+        if (oldLinks.value == '') return
         content.value = content.value.replace('请将旧链放于此', oldLinks.value)
     }
     //添加过往修正
@@ -128,6 +131,15 @@
                         oldComment.value += '\n\n'
                 });
             }
+            ElMessageBox.confirm('是否立即填入？', '提示', {
+                confirmButtonText: '填入',
+                cancelButtonText: '取消',
+                type: 'info',
+            }).then(() => {
+                addComments()
+                addCredit()
+                addLinks()
+            })
         }
         else {
             rsID.value = 0
@@ -212,7 +224,8 @@
         publishInfo.value.push('动漫花园：' + result[3])
         publishInfo.value.push('Acgnx：' + result[4])
         publishInfo.value.push('末日动漫：' + result[5])
-        content.value = content.value.replace('链接加载中', generateLinks())
+        if (result[6] == 'true')
+            content.value = content.value.replace('链接加载中', generateLinks())
         loadingBT.value = false
         ElMessage('加载完成')
     }
@@ -234,6 +247,18 @@
 <template>
      <div :style="{height: slbHeight}">
         <el-scrollbar style="height: 100%;">
+            <el-row>
+                <el-col :span="3" />
+                <el-col :span="18">
+                    <span style="float: left">
+                        <el-link :underline="false" @click="toPublish" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
+                    </span>
+                    <span style="float: right">
+                        <el-link :underline="false" @click="toFinish" type="primary">跳过<el-icon><ArrowRight /></el-icon></el-link>
+                    </span>
+                </el-col>
+                <el-col :span="3" />
+            </el-row>
             <el-row style="height: 20px;" />
             <el-row style="font-size: xx-large; height: 43px; ">
                 <el-col :span="3" />
@@ -299,10 +324,12 @@
                         </el-form>
                     </div>
                     <el-collapse>
-                        <el-collapse-item v-loading="loadingBT" title="BT链接">
-                            <el-link :underline="false" @click="loadBT()" type="primary">刷新<el-icon><Refresh /></el-icon></el-link>
-                            <el-link :underline="false" @click="copyLinks()" type="primary" style="margin-left: 10px;">复制<el-icon><DocumentCopy /></el-icon></el-link>
-                            <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
+                        <el-collapse-item title="BT链接">
+                            <div v-loading="loadingBT">
+                                <el-link :underline="false" @click="loadBT()" type="primary">刷新<el-icon><Refresh /></el-icon></el-link>
+                                <el-link :underline="false" @click="copyLinks()" type="primary" style="margin-left: 10px;">复制<el-icon><DocumentCopy /></el-icon></el-link>
+                                <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
+                            </div>
                         </el-collapse-item>
                         <el-collapse-item title="填写模板">
                             <h3>Credit信息：</h3>

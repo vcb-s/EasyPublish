@@ -972,6 +972,23 @@ async function setSiteUAP(_event, op: boolean, username: string, password: strin
   return [config.username, config.password]
 }
 
+//导入导出Cookies
+async function exportCookies(_event, type: number) {
+  const { canceled, filePath } = await dialog.showSaveDialog({filters: [{name: 'JSON', extensions: ['json']}]})
+  if (canceled) return
+  fs.writeFileSync(filePath, JSON.stringify(db.data.cookies[type].cookie))
+}
+async function importCookies(_event, type: number) {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openFile'], 
+    filters: [{name: 'JSON', extensions: ['json']}]
+  })
+  if (canceled) return
+  db.data.cookies[type].cookie = JSON.parse(fs.readFileSync(filePaths[0], {encoding: 'utf-8'}))
+  db.write()
+  mainWindowWebContent.send('refreshLoginData')
+}
+
 //打开项目目录
 async function openDirectory(_event, path: string){
   shell.openPath(path)
@@ -1011,17 +1028,42 @@ async function createTask(_event, path: string, config: PublishConfig) {
       return 'noSuchFolder'
     }
     else{
+      if (config.name == '')
+        config.name = getNowFormatDate().replace(/:/g, '-')
       fs.mkdirSync(path + '\\' +  config.name)
-      if (config.type == 'file') {
+      if (config.type == 'text') {
+        const text: Content_text = {
+          Name_Ch: '',
+          Name_En: '',
+          Name_Jp: '',
+          bit: '10-bit',
+          resolution: '1080p',
+          encoding: 'HEVC',
+          torrent_type: 'BDRip',
+          reseed: false,
+          nomination: false,
+          note: [],
+          comment_Ch: '',
+          comment_En: '',
+          rs_version: 1,
+          members: {
+            script: '',
+            encode: '',
+            collate: '',
+            upload: ''
+          },
+          picture_path: '',
+          prefill: false
+        }
+        config.content = text
+      }
+      else {
         const file: Content_file = {
           path_md: '',
           path_html: '',
           path_bbcode: '',
         }
         config.content = file
-      }
-      else {
-        //使用模板创建，待开发
       }
       fs.writeFileSync(path + '\\' +  config.name + '\\config.json', JSON.stringify(config))
       let id = Date.now()
@@ -1234,7 +1276,7 @@ async function saveContent(_event, id: number, config_: string) {
   else return 'success'
 }
 
-//创建时打开任务
+//创建时打开任务 / 获取任务信息
 async function openTask(_event, id: number) {
   try{
     let storage = db.data.posts.find(item => item.id == id)
@@ -1379,6 +1421,7 @@ async function checkAllLoginStatus(_event) {
 
 //删除任务
 async function removeTask(_event, index: number) {
+  fs.rmSync(db.data.posts.find((item) => item.id == index)!.path, { recursive: true, force: true })
   db.data.posts = db.data.posts.filter((item) => item.id != index)
   db.write()
   mainWindowWebContent.send('refreshTaskData')
@@ -1542,6 +1585,7 @@ async function getBTLinks(_event, id: number) {
     storage.step = 'site'
     await db.write()
     let result: string[] = []
+    let isFinished = 'true'
     //若bangumi团队同步未完成则再次尝试获取各站链接
     if (storage.sync && 
       !storage.acgrip && 
@@ -1549,9 +1593,11 @@ async function getBTLinks(_event, id: number) {
       !storage.acgnx_g && 
       !storage.acgnx_a
     ){
+      isFinished = 'false'
       let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/')[1]}, { responseType: 'json' })
       for (let index = 0; index < 5; index++) {
         if (response.status == 200 && response.data.sync){ 
+          isFinished = 'true'
           storage.sync = false
           break
         }
@@ -1597,6 +1643,7 @@ async function getBTLinks(_event, id: number) {
     result.push(storage.dmhy ? storage.dmhy : '')
     result.push(storage.acgnx_g ? storage.acgnx_g : '')
     result.push(storage.acgnx_a ? storage.acgnx_a : '')
+    result.push(isFinished)
     return result
   }
   catch (err) {
@@ -1632,6 +1679,7 @@ async function clearStorage(_event) {
   db.data.cookies.forEach((item) =>{
     item.cookie = []
   })
+  db.write()
   mainWindowWebContent.send('refreshLoginData')
 }
 
@@ -1748,6 +1796,8 @@ app.whenReady().then(async () => {
   ipcMain.on('removeTask', removeTask)
   ipcMain.on('clearStorage', clearStorage)
   ipcMain.on('writeClipboard', writeClipboard)
+  ipcMain.on('exportCookies', exportCookies)
+  ipcMain.on('importCookies', importCookies)
 
   //配置axios代理
   let pconf = db.data.proxyConfig

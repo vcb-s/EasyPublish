@@ -6,16 +6,19 @@
     const router = useRouter()
 
     const src = ref('')
+    let type = false
 
-    function toSite() {
+    function back() {
         router.push({
-            name: 'site',
+            name: type ? 'publish' : 'site',
             params: {id: props.id}
         })
     }
 
     async function loadData() {
         src.value = await window.api.GetSiteSrc(props.id)
+        const {status} = await window.api.OpenTask(props.id)
+        type = status == 'quick'
     }
 
     onMounted(() => {
@@ -37,7 +40,7 @@
                 <el-row style="height: 20px;" />
             </div>
             <div>
-                <el-button @click="toSite" type="primary" plain>返回</el-button>
+                <el-button @click="back" type="primary" plain>返回</el-button>
             </div>
         </template>
     </el-result>

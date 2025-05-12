@@ -114,7 +114,7 @@
                 <el-col :span="18">
                     <el-checkbox label="显示已完成项目" v-model="incomplete" />
                     <el-row style="height: 10px;" />
-                    <el-table style="width: 100%; height: 100%" :data="tabledata">
+                    <el-table style="width: 100%; height: 100%" :data="tabledata" :default-sort="{prop: 'id', order: 'descending'}">
                         <el-table-column fixed="right" label="发布" width="80">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" 

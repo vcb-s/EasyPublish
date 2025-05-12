@@ -20,12 +20,13 @@
             callback(new Error('请填写参与制作者'))
     }
     //设置表单
+    const loadCompleted = ref(false)
     const createForm_file = ref()
     const createForm_text = ref()
     const url_type = ref('html')
     const type = ref(true)
     interface ruleForm {
-        type: string,
+        type: "quick" | "file" | "text",
         name: string,
         torrent: string,
         Name_Ch: string,
@@ -76,26 +77,26 @@
         prefill: boolean
     }
     const config = reactive<ruleForm>({
-        type: "file",
+        type: "quick",
         name: "",
         torrent: "",
         Name_Ch: "",
         Name_En: "",
         Name_Jp: "",
         information: '',
-        bit: "10-bit",
+        bit: "",
         picture_path: '',
         nomination: false,
         reseed: false,
-        resolution: "1080p",
-        encoding: "HEVC",
+        resolution: "",
+        encoding: "",
         comment_Ch: '',
         comment_En: '',
         script: '',
         encode: '',
         collate: '',
         upload: '',
-        torrent_type: "BDRip",
+        torrent_type: "",
         note: [],
         category_bangumi: "",
         category_nyaa: "",
@@ -621,7 +622,7 @@
     async function generateConfig() {
         if (type.value) {
             let publishConfig: PublishConfig = {
-                type: 'file',
+                type: config.type,
                 name: '',
                 torrent: config.torrent,
                 information: config.information,
@@ -720,7 +721,7 @@
                     })
                     setTimeout(() => {
                         router.push({
-                            name: 'check',
+                            name: config.name == 'file' ? 'check' : 'publish',
                             params: { id: props.id }
                         })
                     }, 500);
@@ -872,7 +873,7 @@
             router.push('/')
         }else{
             Object.assign(config, result.config, result.config!.content)
-            type.value = result.config!.type == 'file'
+            type.value = !(result.status == 'text')
             config.tag.map((val) => {
                 BangumiTags.value.push({label: val.label, value: val})
             })
@@ -892,14 +893,24 @@
 
     onMounted(async () => {
         setscrollbar()
-        getTaskInfo()
+        await getTaskInfo()
+        loadCompleted.value = true
     })
     
 </script>
 
 <template>
-    <div :style="{height: slbHeight}">
+    <div v-if="loadCompleted" :style="{height: slbHeight}">
         <el-scrollbar style="height: 100%;">
+            <el-row>
+                <el-col :span="3" />
+                <el-col :span="18">
+                    <span style="float: right">
+                        <el-link :underline="false" @click="create" type="primary">下一步<el-icon><ArrowRight /></el-icon></el-link>
+                    </span>
+                </el-col>
+                <el-col :span="3" />
+            </el-row>
             <el-row style="height: 20px;" />
             <el-row style="font-size: xx-large; height: 43px;">
                 <el-col :span="3" />
@@ -1154,7 +1165,7 @@
                             </el-form-item>
                             <el-form-item label="Bangumi标签">
                                 <el-select-v2
-                                    v-model="config.tag" value-key="value" placeholder="请选择或添加Bangumi标签"
+                                    v-model="config.tag" value-key="label" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
                                     :remote-method="searchBangumiTags" :loading="isSearching" @focus="getBangumiTags"
                                 />
