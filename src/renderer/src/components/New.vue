@@ -8,28 +8,32 @@
     interface ruleForm {
         name: string
         path: string
-        type: string
+        type: "quick" | "file" | "text"
     }
     const createForm = ref()
     const form = reactive<ruleForm>({
         name: '',
-        type: '',
+        type: 'quick',
         path: '',
     })
     const options = [
+        {
+            value: 'quick',
+            label: '快速发布'
+
+        },
         {
             value: 'file',
             label: '从文件创建'
         },
         {
             value: 'text',
-            label: '从模板创建',
-            disabled: false //暂未开发
+            label: '从模板创建'
         }
     ]
     const rules = reactive<FormRules<ruleForm>>({
         name: [{
-            required: true,
+            required: false,
             message: '请输入任务名称',
             trigger: 'change'
         }],
@@ -75,7 +79,7 @@
         await formEl.validate(async (valid, _fields) => {
             if (valid) {
                 const config: PublishConfig = {
-                    type: form.type == 'file' ? 'file' : 'text',
+                    type: form.type,
                     name: form.name,
                     torrent: '',
                     information: 'https://vcb-s.com/archives/138',

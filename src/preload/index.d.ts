@@ -47,7 +47,9 @@ export interface IElectronAPI {
   ClearStorage: () => void
   WriteClipboard: (str: string) => void
   SearchPosts: (str: string) => Promise<Message_rsPosts[]>
-  LoadFromTxt: () =>Promise<string[]>
+  LoadFromTxt: () => Promise<string[]>
+  ExportCookies: (type: number) => void
+  ImportCookies: (type: number) => void
 }
 
 declare global {

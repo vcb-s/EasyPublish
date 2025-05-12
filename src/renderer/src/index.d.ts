@@ -47,7 +47,7 @@ export interface Content_file {
 }
 
 export interface PublishConfig {
-  type: 'text' | 'file'
+  type: 'text' | 'file' | 'quick'
   name: string
   torrent: string
   torrentname?: string

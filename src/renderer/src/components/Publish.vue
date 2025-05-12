@@ -6,6 +6,7 @@
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
+    let type = false //项目类型
 
     //设置滚动条区域高度
     const slbHeight = ref('')
@@ -20,15 +21,15 @@
     }
 
     //路由跳转
-    function toCheck() {
+    function back() {
         router.push({
-            name: 'check',
+            name: type ? 'create' : 'check',
             params: {id: props.id}
         })
     }
-    function toSite() {
+    function next() {
         router.push({
-            name: 'site',
+            name: type ? 'finish' : 'site',
             params: {id: props.id}
         })
     }
@@ -138,6 +139,9 @@
                 }
             }
         }))
+        const {status} = await window.api.OpenTask(props.id)
+        console.log(status)
+        type = status == 'quick'
     }
     
     //发布
@@ -211,7 +215,18 @@
 <template>
     <div :style="{height: slbHeight}">
         <el-scrollbar style="height: 100%;">
-            <!-- 占行 -->
+            <el-row>
+                <el-col :span="3" />
+                <el-col :span="18">
+                    <span style="float: left">
+                        <el-link :underline="false" @click="back" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
+                    </span>
+                    <span style="float: right">
+                        <el-link :underline="false" @click="next" type="primary">下一步<el-icon><ArrowRight /></el-icon></el-link>
+                    </span>
+                </el-col>
+                <el-col :span="3" />
+            </el-row>
             <el-row style="height: 20px;" />
             <el-row style="font-size: xx-large; height: 43px; ">
                 <el-col :span="3" />
@@ -220,7 +235,6 @@
                 </el-col>
                 <el-col :span="3" />
             </el-row>
-            <!-- 占行 -->
             <el-row style="height: 20px;" />
             <el-row justify="space-between">
                 <el-col :span="3" />
@@ -254,10 +268,10 @@
             <el-row style="height: 20px;" />
             <el-row class="title">
                 <el-col>
-                    <el-button class="btn" @click="toCheck()" type="primary" plain>
+                    <el-button class="btn" @click="back" type="primary" plain>
                         上一步
                     </el-button>
-                    <el-button class="btn" @click="toSite()" type="primary">
+                    <el-button class="btn" @click="next" type="primary">
                         下一步
                     </el-button>  
                 </el-col>  

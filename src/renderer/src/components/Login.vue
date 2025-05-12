@@ -89,6 +89,14 @@
         for (let index = 0; index < 6; index++) tabledata[index].status = result[index].status
     }
     window.api.RefreshLoginData(loadData)
+
+    //导入导出Cookies
+    async function exportCookies(type: number) {
+        window.api.ExportCookies(type)
+    }
+    async function importCookies(type: number) {
+        window.api.ImportCookies(type)
+    }
     
     //设置颜色
     const tableRowClassName = ({ rowIndex }: { rowIndex: number }) => {
@@ -209,14 +217,24 @@
                         刷新
                     </el-button>
                     <el-table style="width: 100%;" row-key="index" :data="tabledata" :row-class-name="tableRowClassName">
+                        <el-table-column fixed="right" label="导入" width="80">
+                            <template #default="scope">
+                                <el-button link type="primary" size="small" @click="importCookies(scope.$index)">导入</el-button>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="导出" width="80">
+                            <template #default="scope">
+                                <el-button link type="primary" size="small" @click="exportCookies(scope.$index)">导出</el-button>
+                            </template>
+                        </el-table-column>
                         <el-table-column fixed="right" label="登录" width="100">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" @click="login(scope.$index)">登录账号</el-button>
                             </template>
                         </el-table-column>
                         <el-table-column prop="site" label="站点"/>
-                        <el-table-column prop="time" label="上次检查时间" width="240" />
-                        <el-table-column prop="status" label="登录状态" width="160" />
+                        <el-table-column prop="time" label="上次检查时间" width="180" />
+                        <el-table-column prop="status" label="登录状态" width="120" />
                         <el-table-column fixed="left" type="expand" width="50">
                             <template #default="props">
                                 <el-row>
