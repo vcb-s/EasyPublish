@@ -5,6 +5,7 @@
 
   const isDark = useDark()
   const toggleDark = () => useToggle(isDark)
+  document.body.style.overflow = "hidden";
 
   //窗口控制
   function WinClose() { window.api.WinHandle("close") }
@@ -27,12 +28,84 @@
     Object.assign(form, JSON.parse(await window.api.GetProxyConfig()))
   })
 
-  document.body.style.overflow = "hidden";
-
+  //人机验证对话框
+  const site = ref('')
+  const imageDialogVisible = ref(false)
+  const reCaptchaDialogVisible = ref(false)
+  const dialogTitle = ref('')
+  const grecaptchaSrc = ref('')
+  const imgSrc = ref('')
+  const imgCaptcha = ref('')
+  const reCaptcha = ref('')
+  //图片验证码处理
+  window.api.GetImageCaptcha(refreshImage)
+  async function refreshImage() {
+    imageDialogVisible.value = true
+    site.value = 'dmhy'
+    dialogTitle.value = '登录到动漫花园'
+    imgSrc.value = 'https://www.dmhy.org/common/generate-captcha?code=' + Date.now()
+  }
+  //处理reCaptcha验证
+  async function setReCaptcha(type: string) {
+    site.value = type
+    if (type == 'nyaa') {
+      grecaptchaSrc.value = 'https://nyaa.si/grecaptcha'
+      dialogTitle.value = '登录到Nyaa'
+    }
+    if (type == 'acgnx_g') {
+      grecaptchaSrc.value = 'https://www.acgnx.se/grecaptcha'
+      dialogTitle.value = '登录到AcgnX'
+    }
+    if (type == 'acgnx_a') {
+      grecaptchaSrc.value = 'https://share.acgnx.se/grecaptcha'
+      dialogTitle.value = '登录到末日动漫'
+    }
+    reCaptchaDialogVisible.value = true
+  }
+  window.api.GetReCaptcha(setReCaptcha)
+  window.addEventListener('message', e => {
+    if (e.origin == 'https://nyaa.si' || e.origin == 'https://www.acgnx.se' || e.origin == 'https://share.acgnx.se') {
+      reCaptcha.value = e.data
+    }
+  })
+  //提交验证码
+  async function submitCaptcha() {
+    if (site.value == 'dmhy'){
+      window.api.CheckLoginStatus('dmhy', imgCaptcha.value)
+      imageDialogVisible.value = false
+    }
+    else {
+      window.api.CheckLoginStatus(site.value, reCaptcha.value)
+      reCaptchaDialogVisible.value = false
+    }
+  }
 </script>
 
 <template>
   <div class="layout">
+    <!--登录人机验证对话框-->
+    <!-- 图形验证码 -->
+    <el-dialog v-model="imageDialogVisible" destroy-on-close :title="dialogTitle" width="220">
+      <el-row>
+        <img :src="imgSrc" style="width: 100px; margin-right: 10px;" />
+        <el-button link type="primary" size="small" @click="refreshImage">换一张</el-button>
+      </el-row>
+      <el-row style="height: 20px;" />
+      <el-row>
+        <el-input v-model="imgCaptcha" style="width: 100px; margin-right: 10px;" />
+        <el-button type="primary" @click="submitCaptcha">确认</el-button>
+      </el-row>
+    </el-dialog>
+    <!-- reCaptcha验证码 -->
+    <el-dialog v-model="reCaptchaDialogVisible" destroy-on-close :title="dialogTitle" width="360">
+      <el-row>
+        <iframe :src="grecaptchaSrc" style="height: 500px;width: 350px;"></iframe>
+      </el-row>
+      <el-row style="height: 20px;" />
+      <el-row>
+        <el-button type="primary" @click="submitCaptcha">确认</el-button>
+      </el-row>
+    </el-dialog>
     <el-container style="height: 100%">
       <!-- 标题栏 -->
       <el-header class="header">

@@ -18,6 +18,7 @@
     //设置表格内容
     type Tabledata = {
         site: string
+        type: string
         time: string
         status: string
         index: number
@@ -27,6 +28,7 @@
     }
     const tabledata = reactive<Tabledata[]>([{
         site: '萌番组',
+        type: 'bangumi',
         time: '',
         status: '',
         username: '',
@@ -36,6 +38,7 @@
     },
     {
         site: 'Nyaa',
+        type: 'nyaa',
         time: '',
         status: '',
         username: '',
@@ -45,6 +48,7 @@
     },
     {
         site: 'Acgrip',
+        type: 'acgrip',
         time: '',
         status: '',
         username: '',
@@ -54,6 +58,7 @@
     },
     {
         site: '动漫花园',
+        type: 'dmhy',
         time: '',
         status: '',
         username: '',
@@ -63,6 +68,7 @@
     },
     {
         site: 'AcgnX',
+        type: 'acgnx_g',
         time: '',
         status: '',
         username: '',
@@ -72,6 +78,7 @@
     },
     {
         site: '末日动漫',
+        type: 'acgnx_a',
         time: '',
         status: '',
         username: '',
@@ -117,14 +124,12 @@
     })
 
     //重新检查
-    function checkLoginStatus() {
-        window.api.CheckLoginStatus()
+    function checkLoginStatus(type: string) {
+        window.api.CheckLoginStatus(type)
     }
 
-    //账户密码提示
-    const isEdit = ref(false)
+    //账户密码
     async function setuap() {
-        isEdit.value = false
         let UAPs: Message_UAP[] = []
         tabledata.forEach(data => {
             UAPs.push({username: data.username, password: data.password})
@@ -176,12 +181,6 @@
         window.api.ClearStorage()
     }
 
-    //右键复制事件
-    function handleRightClick(str: string) {
-        window.api.WriteClipboard(str)
-        ElMessage('复制成功')
-    }
-
 </script>
 
 <template>
@@ -207,8 +206,8 @@
                     <el-button style="float: right;text-align: right; margin-bottom: 20px; margin-right: 10px;" 
                     type="primary" plain
                     :icon="Key"
-                    @click="checkLoginStatus()">
-                        检查
+                    @click="checkLoginStatus('all')">
+                        全部检查
                     </el-button>
                     <el-button style="float: right;text-align: right; margin-bottom: 20px;" 
                     :icon="RefreshRight"
@@ -217,19 +216,24 @@
                         刷新
                     </el-button>
                     <el-table style="width: 100%;" row-key="index" :data="tabledata" :row-class-name="tableRowClassName">
-                        <el-table-column fixed="right" label="导入" width="80">
+                        <el-table-column fixed="right" label="检查" width="60">
+                            <template #default="scope">
+                                <el-button link type="primary" size="small" @click="checkLoginStatus(scope.row.type)">检查</el-button>
+                            </template>
+                        </el-table-column>
+                        <el-table-column fixed="right" label="导入" width="60">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" @click="importCookies(scope.$index)">导入</el-button>
                             </template>
                         </el-table-column>
-                        <el-table-column fixed="right" label="导出" width="80">
+                        <el-table-column fixed="right" label="导出" width="60">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" @click="exportCookies(scope.$index)">导出</el-button>
                             </template>
                         </el-table-column>
                         <el-table-column fixed="right" label="登录" width="100">
                             <template #default="scope">
-                                <el-button link type="primary" size="small" @click="login(scope.$index)">登录账号</el-button>
+                                <el-button link type="primary" size="small" @click="login(scope.$index)">打开网站</el-button>
                             </template>
                         </el-table-column>
                         <el-table-column prop="site" label="站点"/>
@@ -240,25 +244,14 @@
                                 <el-row>
                                     <el-col :span="1" />
                                     <el-col :span="22">
-                                        <el-row style="margin-top: 15px;">
-                                            <span @dblclick="isEdit = true">用户名：</span>
-                                            <el-input size="small" style="width: 240px;" @blur="setuap()" v-if="isEdit" v-model="props.row.username" />
-                                            <span @dblclick="isEdit = true" 
-                                            @contextmenu.prevent="handleRightClick(props.row.username)" 
-                                            v-else>{{ props.row.username }}</span>
-                                        </el-row>
-                                        <el-row style="margin-top: 15px;">
-                                            <span @dblclick="isEdit = true">密码：</span>
-                                            <el-input size="small" style="width: 240px;" @blur="setuap()" v-if="isEdit" v-model="props.row.password" />
-                                            <span @dblclick="isEdit = true" 
-                                            @contextmenu.prevent="handleRightClick(props.row.password)" 
-                                            v-else>{{ props.row.password }}</span>
-                                        </el-row>
-                                        <h3>Cookies</h3>
-                                        <el-table :data="props.row.cookies">
-                                            <el-table-column label="Name" prop="name" />
-                                            <el-table-column label="Value" prop="value" />
-                                        </el-table>
+                                        <el-form label-width="auto">
+                                            <el-form-item label="用户名">
+                                                <el-input style="width: 300px;" @blur="setuap()" v-model="props.row.username" />
+                                            </el-form-item>
+                                            <el-form-item label="密码">
+                                                <el-input style="width: 300px;" @blur="setuap()" v-model="props.row.password" />
+                                            </el-form-item>
+                                        </el-form>
                                     </el-col>
                                     <el-col :span="1" />
                                 </el-row>

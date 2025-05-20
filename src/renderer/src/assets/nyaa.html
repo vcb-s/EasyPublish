@@ -1,0 +1,20 @@
+<!doctype html>
+<html>
+     <head>
+        <meta charset="UTF-8" />
+        <title>登录到Nyaa</title>
+     </head>
+     <body>
+        <div id="grecaptcha"></div>
+        <script src="https://www.google.com/recaptcha/api.js?onload=onloadCallback&render=explicit" async defer></script>
+        <script type="text/javascript">
+            var sendgrecaptcha = function (response) {
+                window.top.postMessage(response, "*")
+            }
+            var onloadCallback = function() {grecaptcha.render('grecaptcha', {
+            'sitekey' : '6LeU4yAUAAAAAI_4K5cAusLUK8ywp1NHsmM7IZCm', 
+            'callback': sendgrecaptcha
+            });};
+        </script>
+     </body>
+</html>

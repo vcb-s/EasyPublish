@@ -89,7 +89,7 @@
         let content: string = ''
         for (let i = 0; i < 6; i++)
             if (BTLinks.value[i] != '' && BTLinks.value[i] != '未找到链接')
-                content += `<a href=${BTLinks.value[i]}>${BTLinks.value[i]}</a>\n\n`
+                content += `<a href="${BTLinks.value[i]}">${BTLinks.value[i]}</a>\n\n`
         return content
     }
     //复制BT链接
@@ -178,6 +178,7 @@
     const isPublishing = ref(false)
     async function submit() {
         let result: string
+        isPublishing.value = true
         if (isRS.value)
             result = await window.api.SiteRSPublish(props.id, rsID.value, title.value, content.value)
         else
@@ -203,6 +204,7 @@
                 })
             }, 500);
         }
+        isPublishing.value = false
     }
 
     //加载信息

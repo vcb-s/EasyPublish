@@ -314,6 +314,10 @@
         {
             label: 'JPN',
             value: 'JPN'
+        },
+        {
+            label: 'CHN',
+            value: 'CHN'
         }
     ])
     const subInfo = ref<string[]>([])
@@ -359,6 +363,14 @@
         {
             label: '外挂 Headphone X',
             value: 4
+        },
+        {
+            label: '外挂评论音轨',
+            value: 5
+        },
+        {
+            label: '外挂无障碍音轨',
+            value: 6
         }
     ])
     const audioInfo = ref<number[]>([])
@@ -366,7 +378,8 @@
     function onChangeAudioInfo() {
         let audio_in_E = ''
         let audio_in_C = ''
-        let audio_out = ''
+        let audio_out_C = ''
+        let audio_out_E = ''
         audioInfo.value.forEach(item => {
             if (item == 1) {
                 audio_in_C = '部分剧集内封评论音轨。'
@@ -377,15 +390,26 @@
                 audio_in_E = 'Embedded commentary track. '
             }
             if (item == 3) {
-                audio_out += 'FLAC 5.1' + ' + '
+                audio_out_C += 'FLAC 5.1' + ' + '
+                audio_out_E += 'FLAC 5.1' + ' + '
             }
             if (item == 4) {
-                audio_out += 'Headphone X' + ' + '
+                audio_out_C += 'Headphone X' + ' + '
+                audio_out_E += 'Headphone X' + ' + '
+            }
+            if (item == 5) {
+                audio_out_C += '评论音轨' + ' + '
+                audio_out_E += 'commentary tracks' + ' + '
+            }
+            if (item == 5) {
+                audio_out_C += '无障碍音轨' + ' + '
+                audio_out_E += 'audio description' + ' + '
             }
         })
-        if (audio_out != ''){
-            audio_out = audio_out.slice(0, -3)
-            audioText.value = `${audio_in_C}外挂 ${audio_out} 。\n${audio_in_E}MKA contains ${audio_out}.`
+        if (audio_out_C != ''){
+            audio_out_C = '外挂 ' + audio_out_C.slice(0, -3)
+            audio_out_E = 'MKA contains ' + audio_out_E.slice(0, -3)
+            audioText.value = `${audio_in_C}${audio_out_C} 。\n${audio_in_E}${audio_out_E}.`
         }
         else
             audioText.value = `${audio_in_C}\n${audio_in_E}`
@@ -541,7 +565,7 @@
         if (!remoteSearchEnable.value) 
             return
         let title = generateTitle()
-        const {data, status} = await window.api.GetBangumiTags(type ? config.title : title)
+        const {data, status} = await window.api.GetBangumiTags(type.value ? config.title : title)
         if (status == 200) {
             suggestedBangumiTags.value = []
             for (let item of data) {
