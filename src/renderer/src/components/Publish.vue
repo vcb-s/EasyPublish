@@ -112,6 +112,8 @@
 
     //加载已发布信息
     async function loadData() {
+        const {status} = await window.api.OpenTask(props.id)
+        type = status == 'quick'
         const publishedSites: Message_PublishStatus[]  = JSON.parse(await window.api.GetPublishInfo(props.id))
         publishedSites.forEach((item => {
             if (item.site == 'bangumi') {
@@ -139,9 +141,6 @@
                 }
             }
         }))
-        const {status} = await window.api.OpenTask(props.id)
-        console.log(status)
-        type = status == 'quick'
     }
     
     //发布

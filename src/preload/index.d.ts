@@ -31,7 +31,7 @@ export interface IElectronAPI {
   RefreshLoginData: (loadData: Function) => void
   RefreshTaskData: (loadData: Function) => void
   SetUAP: (UAPs: string) => void
-  CheckLoginStatus: () => void
+  CheckLoginStatus: (type: string, value?: string) => void
   RemoveTask: (index: number) => void
   GetAllTask: () => Promise<Message_TaskInfo[]>
   GetPublishInfo: (id: number) => Promise<string>
@@ -50,6 +50,8 @@ export interface IElectronAPI {
   LoadFromTxt: () => Promise<string[]>
   ExportCookies: (type: number) => void
   ImportCookies: (type: number) => void
+  GetImageCaptcha: (loadImage: Function) => void
+  GetReCaptcha: (loadImage: Function) => void
 }
 
 declare global {

@@ -16,9 +16,9 @@
     }
 
     async function loadData() {
-        src.value = await window.api.GetSiteSrc(props.id)
         const {status} = await window.api.OpenTask(props.id)
         type = status == 'quick'
+        src.value = await window.api.GetSiteSrc(props.id)
     }
 
     onMounted(() => {

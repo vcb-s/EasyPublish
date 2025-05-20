@@ -16,15 +16,19 @@
 
 ![登录管理](readme/08.png)
 
-在此可以打开各发布站的网站并登录。
+*新的登录机制仍处于测试阶段，可能尚不稳定。若遇到BUG可点击打开网站手动登录。*
 
-检查按钮将会检查所有站点的登录状态，若未登录或遇防火墙阻止请点击登录账号登录并通过人机验证。遇访问失败请检查网络环境并确保能够正常访问网站。
+在此输入各站的用户名和密码，用以登录各站。或者点击打开网站手动登录，EasyPublish会在登录窗口关闭时记录登录状态。
+
+全部检查按钮将会检查所有站点的登录状态，点击检查按钮会先检查该站的登录状态，若未登录则尝试使用输入的用户名和密码自动登录。其中，Nyaa、AcgnX、动漫花园需要手动进行人机验证。
+
+遇访问失败请检查网络环境并确保能够正常访问网站。遇到AcgnX的防火墙阻止时，EasyPublish会自动弹出网站，在通过其人机验证后关闭即可。
+
+导入导出按钮会以json的形式导入和导出EasyPublish保存的Cookie。
 
 清除缓存按钮将清除登录窗口的所有缓存并清除EasyPublish保存的Cookie。
 
 页面会自动刷新（如果没出BUG的话），所以刷新按钮意义不大。
-
-*（可选功能）* 由于EasyPublish并不具备记住密码的功能，在此提供一个记录账号密码的功能，双击修改，右键复制，输入框失焦时自动保存。
 
 ![用户名密码](readme/04.png)
 
@@ -47,6 +51,14 @@ EasyPublish不会自动使用系统代理，若非VPN/TUN等请先配置代理�
 ![新建项目](readme/01.png)
 
 填写项目名称和存放配置的地址，该名称不作为发布时的标题。*（本地保存路径和项目名称已不再是必填项）* 
+
+任务类型分为从文件创建、从模版创建和快速发布。
+
+从文件创建需要提供发布稿和标题等必要信息，但发布流程仍然完整。
+
+快速发布只保留发布流程的必要环节，与从文件创建基本相同，但环节更少，适用于非VCB标准的发布。
+
+从模版创建需要提供项目的各种信息，并由EasyPublish生成发布稿，格式上符合VCB发布标准。
 
 ### 管理本地项目
 
@@ -169,13 +181,11 @@ EasyPublish不会自动使用系统代理，若非VPN/TUN等请先配置代理�
 
 EasyPublish在发布之前会再次检查登录状态，若出现异常请前往登录管理登录账号，再转到管理本地项目继续发布。
 
-对于末日动漫，若遇防火墙阻止将直接打开登录页面，请通过验证后再次尝试发布。
+对于末日动漫，若遇防火墙阻止将弹出登录页面，请通过人机验证后再次尝试发布。
 
 萌番组有团队同步和非团队同步两种发布方式，任意一项发布完成均不可再次在萌番组发布。
 
 另部分情况下可能出现疑似由网络波动造成的已发布但显示种子已存在，若出现以上情况请携日志反馈。
-
-支持多选批量发布，但请参阅提示。
 
 ### 主站发布
 
@@ -189,7 +199,9 @@ EasyPublish在发布之前会再次检查登录状态，若出现异常请前往
 
 中间折叠有前面步骤自动获取的BT站对应链接，以方便填写发布搞对应位置，右键可复制。
 
-新增复制按钮，可以html格式复制全部BT链接。
+刷新会尝试再次获取未同步的链接（萌番组团队同步）或未获取到的链接（动漫花园），获取到后将自动填入发布稿中（仅项目为模版创建时有效）。
+
+复制按钮可以html格式复制全部BT链接。
 
 ![link](readme/12.png)
 
@@ -213,35 +225,23 @@ EasyPublish在发布之前会再次检查登录状态，若出现异常请前往
 
 ------
 
-## 其他事项
-
-右上有可以切换明暗主题的滑块。
-
-~~*开发是业余的，框架是现学的。*~~ 
-
-~~*代码是一坨的，BUG是一堆的。*~~ 
-
-~~*功能是勉强能用的，优化是一点没有的。*~~ 
-
-------
-
 ## 开源许可
 
-| 项目               | 库                                                           |
-| ------------------ | ------------------------------------------------------------ |
-| electron           | [https://github.com/electron/electron](https://github.com/electron/electron) |
-| vue                | [https://github.com/vuejs/core](https://github.com/vuejs/core) |
-| vue-router         | [https://github.com/vuejs/router](https://github.com/vuejs/router) |
-| axios              | [https://github.com/axios/axios](https://github.com/axios/axios) |
-| axios-retry        | [https://github.com/softonic/axios-retry](https://github.com/softonic/axios-retry) |
-| element-plus       | [https://github.com/element-plus/element-plus](https://github.com/element-plus/element-plus) |
-| electron-log       | [https://github.com/megahertz/electron-log](https://github.com/megahertz/electron-log) |
-| lowdb              | [https://github.com/typicode/lowdb](https://github.com/typicode/lowdb) |
-| bbob               | [https://github.com/JiLiZART/bbob](https://github.com/JiLiZART/bbob) |
-| marked             | [https://github.com/markedjs/marked](https://github.com/markedjs/marked) |
-| commonmark         | [https://github.com/commonmark/commonmark.js](https://github.com/commonmark/commonmark.js) |
-| markdown-to-bbcode | [https://github.com/ddormer/markdown-to-bbcode](https://github.com/ddormer/markdown-to-bbcode) |
-| Turndown           | [https://github.com/mixmark-io/turndown](https://github.com/mixmark-io/turndown) |
+| 项目               | 开源协议           | 库                                                           |
+| ------------------ | ------------------ | ------------------------------------------------------------ |
+| electron           | MIT License        | [https://github.com/electron/electron](https://github.com/electron/electron) |
+| vue                | MIT License        | [https://github.com/vuejs/core](https://github.com/vuejs/core) |
+| vue-router         | MIT License        | [https://github.com/vuejs/router](https://github.com/vuejs/router) |
+| axios              | MIT License        | [https://github.com/axios/axios](https://github.com/axios/axios) |
+| axios-retry        | Apache License 2.0 | [https://github.com/softonic/axios-retry](https://github.com/softonic/axios-retry) |
+| element-plus       | MIT License        | [https://github.com/element-plus/element-plus](https://github.com/element-plus/element-plus) |
+| electron-log       | MIT License        | [https://github.com/megahertz/electron-log](https://github.com/megahertz/electron-log) |
+| lowdb              | MIT License        | [https://github.com/typicode/lowdb](https://github.com/typicode/lowdb) |
+| bbob               | MIT License        | [https://github.com/JiLiZART/bbob](https://github.com/JiLiZART/bbob) |
+| marked             | MIT License        | [https://github.com/markedjs/marked](https://github.com/markedjs/marked) |
+| commonmark         | BSD License        | [https://github.com/commonmark/commonmark.js](https://github.com/commonmark/commonmark.js) |
+| markdown-to-bbcode | MIT License        | [https://github.com/ddormer/markdown-to-bbcode](https://github.com/ddormer/markdown-to-bbcode) |
+| Turndown           | MIT License        | [https://github.com/mixmark-io/turndown](https://github.com/mixmark-io/turndown) |
 
 ------
 

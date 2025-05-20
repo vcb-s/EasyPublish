@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Cookie, session, clipboard } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Cookie, session, clipboard, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import type { PublishConfig, 
@@ -17,10 +17,15 @@ import axios from 'axios'
 import axiosRetry from 'axios-retry'
 import log from 'electron-log'
 import socksProxy from 'socks-proxy-agent'
-import appIcon from '../../build/icon.ico?asset'
 import commonmark from "commonmark"
 import md2bbc from 'markdown-to-bbcode'
 import html2md from 'turndown'
+import CryptoJS from 'crypto-js'
+
+//静态资源
+import acgnxResponse from '../renderer/src/assets/acgnx.html?asset'
+import nyaaResponse from '../renderer/src/assets/nyaa.html?asset'
+import appIcon from '../../build/icon.ico?asset'
 
 /*
                    _ooOoo_
@@ -55,6 +60,7 @@ log.transports.file.resolvePathFn = ()=> app.getPath('userData') + '\\logs\\' + 
 log.initialize()
 console.log = log.log
 console.log(app.getPath('userData') + '\\logs\\' + dateStr + '.log')
+
 process.on('uncaughtException', (err) => {log.error(err)})
 type Storage = {
   id: number
@@ -397,7 +403,7 @@ async function BTPublish(_event, id: number, type: string) {
         return 'exist'
       }
       if ((response.data as string).includes('上傳成功')) {
-        //dmhy发布后不会返回发布的链接，需要从管理页获取，但网站数据同步还有延迟，算是难用到一定程度了，不知道bangumi团队同步是怎么解决这个问题的
+        //dmhy发布后不会返回发布的链接，需要从管理页获取，但网站数据同步还有延迟
         let postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
         let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
         var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + rtitle)
@@ -678,17 +684,20 @@ async function createLoginWindow(type: string) {
   if (type == 'bangumi') url = 'https://bangumi.moe'
   else if (type == 'nyaa') url = 'https://nyaa.si/login'
   else if (type == 'acgrip') url = 'https://acg.rip/users/sign_in'
-  else if (type == 'dmhy') url = 'https://www.dmhy.org/user/login'
+  else if (type == 'dmhy') url = 'https://www.dmhy.org/user'
   else if (type == 'acgnx_g') url = 'https://www.acgnx.se/user.php?o=login'
   else url = 'https://share.acgnx.se/user.php?o=login'
 
+  const partition = 'persist:login'
+  let ses = session.fromPartition(partition)
+
   //获取并保存cookie信息
   async function setCookies(type: string, url: string) {
-    await loginWindow.webContents.session.cookies.get({url: url}).then((cookies) => {
+    await ses.cookies.get({url: url}).then((cookies) => {
       db.data.cookies.find(item => item.name == type)!.cookie = cookies
     }).catch(err => {console.log(err)})
     if (type.includes('acgnx'))
-      await loginWindow.webContents.session.cookies.get({name: 'cf_clearance'}).then((cookies) => {
+      await ses.cookies.get({name: 'cf_clearance'}).then((cookies) => {
         db.data.cookies.find(item => item.name == type)!.cookie.push(...cookies)
     }).catch(err => {console.log(err)})
     await db.write()
@@ -702,6 +711,9 @@ async function createLoginWindow(type: string) {
     autoHideMenuBar: true,
     show: false,
     icon: appIcon,
+    webPreferences: {
+      partition: partition
+    },
   })
 
   loginWindow.on('ready-to-show', async () => {
@@ -725,7 +737,7 @@ async function createLoginWindow(type: string) {
   })
 
   //拦截设置useragent
-  loginWindow.webContents.session.webRequest.onBeforeSendHeaders((details, callback) => {
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
     details.requestHeaders['User-Agent'] = userAgent
     callback({ requestHeaders: details.requestHeaders })
   })
@@ -748,6 +760,25 @@ function getCurrentTime() {
   return currentTime
 }
 
+//响应前端检查
+async function checkLogin(_event, type: string, value?: string) {
+  if (type == 'all') {
+    checkLoginStatus('bangumi')
+    checkLoginStatus('nyaa')
+    checkLoginStatus('dmhy')
+    checkLoginStatus('acgrip')
+    checkLoginStatus('acgnx_a')
+    checkLoginStatus('acgnx_g')
+  }
+  else {
+    if (!value)
+      await checkLoginStatus(type)
+    let status = db.data.cookies.find((item) => item.name == type)!.status
+    if (status == '账号未登录' || value) {
+      BTLogin(type, value)
+    }
+  }
+}
 //判断登陆状态
 async function checkLoginStatus(type: string) {
   try{
@@ -857,11 +888,13 @@ async function checkLoginStatus(type: string) {
       else if (status == 403) {
         db.data.cookies[4].time = getCurrentTime()
         db.data.cookies[4].status = '防火墙阻止'
+        createLoginWindow('acgnx_g')
       }
       else if (status == 200) {
         if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
           db.data.cookies[4].time = getCurrentTime()
           db.data.cookies[4].status = '防火墙阻止'
+          createLoginWindow('acgnx_g')
         }
         else {
           db.data.cookies[4].time = getCurrentTime()
@@ -872,7 +905,7 @@ async function checkLoginStatus(type: string) {
         throw response
       }
     }
-    else {
+    else if (type == 'acgnx_a') {
       url = 'https://share.acgnx.se/user.php'
       let response = await axios.get(url, { responseType: 'text' })
       for (let i = 0;i < 5;i++) {
@@ -889,11 +922,13 @@ async function checkLoginStatus(type: string) {
       else if (status == 403) {
         db.data.cookies[5].time = getCurrentTime()
         db.data.cookies[5].status = '防火墙阻止'
+        createLoginWindow('acgnx_a')
       }
       else if (status == 200) {
         if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
           db.data.cookies[5].time = getCurrentTime()
           db.data.cookies[5].status = '防火墙阻止'
+        createLoginWindow('acgnx_a')
         }
         else {
           db.data.cookies[5].time = getCurrentTime()
@@ -905,6 +940,7 @@ async function checkLoginStatus(type: string) {
       }
     }
     await db.write()
+    mainWindowWebContent.send('refreshLoginData')
   }
   catch(err){
     console.log(err)
@@ -932,6 +968,301 @@ async function checkLoginStatus(type: string) {
       db.data.cookies[5].time = getCurrentTime()
       db.data.cookies[5].status = '访问失败'}
     await db.write()
+  }
+}
+//登录账号
+async function BTLogin(type: string, value?: string) {
+  try {
+    let url: string
+    const partition = 'persist:login'
+    let ses = session.fromPartition(partition)
+    if (type == 'bangumi') {
+      db.data.cookies[0].time = getCurrentTime()
+      db.data.cookies[0].status = '正在登录'
+      await db.write()
+      mainWindowWebContent.send('refreshLoginData')
+      url = 'https://bangumi.moe/api/user/signin'
+      let uname = db.data.cookies[0].username
+      let pwd = db.data.cookies[0].password
+      let response = await axios.post(url, {username: uname, password: CryptoJS.MD5(pwd).toString()})
+      if (response.data.success) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://bangumi.moe', name: name, value: value, httpOnly: true})
+        });
+        await ses.cookies.get({url: 'https://bangumi.moe'}).then((cookies) => {
+          db.data.cookies[0].cookie.push(...cookies)
+        }).catch(err => {console.log(err)})
+        db.data.cookies[0].time = getCurrentTime()
+        db.data.cookies[0].status = '账号已登录'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else {
+        db.data.cookies[0].time = getCurrentTime()
+        db.data.cookies[0].status = '账号密码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+    }
+    else if (type == 'acgrip') {
+      db.data.cookies[2].time = getCurrentTime()
+      db.data.cookies[2].status = '正在登录'
+      await db.write()
+      mainWindowWebContent.send('refreshLoginData')
+      url = 'https://acg.rip/users/sign_in'
+      const formData = new FormData()
+      //CSRF验证
+      const csrf = await axios.get(url, { responseType: 'text' })
+      let cookievalue = csrf.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
+      let _kanako_session = db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))
+      if (_kanako_session)
+        _kanako_session.value = cookievalue
+      else 
+        db.data.cookies[2].cookie.push({name: '_kanako_session', value: cookievalue, sameSite: 'lax'})
+      await db.write()
+      const token = (csrf.data as string).match(/name="csrf-token"\scontent="([\S]*?)"/)![1]
+      formData.append('authenticity_token', token)
+      let uname = db.data.cookies[2].username
+      let pwd = db.data.cookies[2].password
+      formData.append('user[email]', uname)
+      formData.append('user[password]', pwd)
+      formData.append('user[remember_me]', '1')
+      formData.append('commit', '登录')
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://acg.rip', name: name, value: value, httpOnly: true})
+        });
+        await ses.cookies.get({url: 'https://acg.rip'}).then((cookies) => {
+          db.data.cookies[2].cookie.push(...cookies)
+        }).catch(err => {console.log(err)})
+        db.data.cookies[2].time = getCurrentTime()
+        db.data.cookies[2].status = '账号已登录'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else if ((response.data as string).includes('邮箱或密码错误')) {
+        db.data.cookies[2].time = getCurrentTime()
+        db.data.cookies[2].status = '账号密码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    else if (type == 'dmhy') {
+      db.data.cookies[3].time = getCurrentTime()
+      db.data.cookies[3].status = '正在登录'
+      await db.write()
+      mainWindowWebContent.send('refreshLoginData')
+      url = 'https://www.dmhy.org/user/login'
+      if (!value) {
+        const result = await axios.get('https://www.dmhy.org/common/generate-captcha?code=' + Date.now())
+        if (result.headers['set-cookie']) {
+          result.headers['set-cookie']!.forEach(async item => {
+            let cookie = item.split(';')[0]
+            let index = cookie.indexOf('=')
+            let name = cookie.slice(0, index)
+            let value = cookie.slice(index + 1, cookie.length)
+            await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true})
+          });
+          await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
+            db.data.cookies[3].cookie.push(...cookies)
+          }).catch(err => {console.log(err)})
+          db.write()
+        }
+        mainWindowWebContent.send('loadIamgeCaptcha')
+        return
+      }
+      let uname = db.data.cookies[3].username
+      let pwd = db.data.cookies[3].password
+      const formData = new FormData()
+      formData.append('goto', 'https://www.dmhy.org/')
+      formData.append('email', uname)
+      formData.append('password', pwd)
+      formData.append('login_node', '0')
+      formData.append('cookietime', '315360000')
+      formData.append('captcha_code', value)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if ((response.data as string).includes('登入成功')) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true})
+        });
+        await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
+          db.data.cookies[3].cookie.push(...cookies)
+        }).catch(err => {console.log(err)})
+        db.data.cookies[3].time = getCurrentTime()
+        db.data.cookies[3].status = '账号已登录'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else if ((response.data as string).includes('帐户密码错误')) {
+        db.data.cookies[3].time = getCurrentTime()
+        db.data.cookies[3].status = '账号密码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else if ((response.data as string).includes('验证码错误')) {
+        db.data.cookies[3].time = getCurrentTime()
+        db.data.cookies[3].status = '验证码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    else if (type == 'nyaa') {
+      db.data.cookies[1].time = getCurrentTime()
+      db.data.cookies[1].status = '正在登录'
+      await db.write()
+      mainWindowWebContent.send('refreshLoginData')
+      if (!value) {
+        mainWindowWebContent.send('loadReCaptcha', 'nyaa')
+        return
+      }
+      url = 'https://nyaa.si/login'
+      const formData = new FormData()
+      let uname = db.data.cookies[1].username
+      let pwd = db.data.cookies[1].password
+      formData.append('username', uname)
+      formData.append('password', pwd)
+      formData.append('g-recaptcha-response', value)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://nyaa.si', name: name, value: value, httpOnly: true})
+        });
+        await ses.cookies.get({url: 'https://nyaa.si'}).then((cookies) => {
+          db.data.cookies[1].cookie.push(...cookies)
+        }).catch(err => {console.log(err)})
+        db.data.cookies[1].time = getCurrentTime()
+        db.data.cookies[1].status = '账号已登录'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else if ((response.data as string).includes('Incorrect username or password')) {
+        db.data.cookies[1].time = getCurrentTime()
+        db.data.cookies[1].status = '账号密码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    else if (type == 'acgnx_g') {
+      db.data.cookies[4].time = getCurrentTime()
+      db.data.cookies[4].status = '正在登录'
+      await db.write()
+      mainWindowWebContent.send('refreshLoginData')
+      if (!value) {
+        mainWindowWebContent.send('loadReCaptcha', 'acgnx_g')
+        return
+      }
+      url = 'https://www.acgnx.se/user.php?o=login'
+      const formData = new FormData()
+      let uname = db.data.cookies[4].username
+      let pwd = db.data.cookies[4].password
+      formData.append('op', 'login')
+      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
+      formData.append('emailaddress', uname)
+      formData.append('password', pwd)
+      formData.append('cookietime', '315360000')
+      formData.append('g-recaptcha-response', value)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://www.acgnx.se', name: name, value: value, httpOnly: true})
+        });
+        await ses.cookies.get({url: 'https://www.acgnx.se'}).then((cookies) => {
+          db.data.cookies[4].cookie.push(...cookies)
+        }).catch(err => {console.log(err)})
+        db.data.cookies[4].time = getCurrentTime()
+        db.data.cookies[4].status = '账号已登录'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else if ((response.data as string).includes('登錄密碼不正確')) {
+        db.data.cookies[4].time = getCurrentTime()
+        db.data.cookies[4].status = '账号密码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    else if (type == 'acgnx_a') {
+      db.data.cookies[5].time = getCurrentTime()
+      db.data.cookies[5].status = '正在登录'
+      await db.write()
+      mainWindowWebContent.send('refreshLoginData')
+      if (!value) {
+        mainWindowWebContent.send('loadReCaptcha', 'acgnx_a')
+        return
+      }
+      url = 'https://share.acgnx.se/user.php?o=login'
+      const formData = new FormData()
+      let uname = db.data.cookies[5].username
+      let pwd = db.data.cookies[5].password
+      formData.append('op', 'login')
+      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
+      formData.append('emailaddress', uname)
+      formData.append('password', pwd)
+      formData.append('cookietime', '315360000')
+      formData.append('g-recaptcha-response', value)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://share.acgnx.se', name: name, value: value, httpOnly: true})
+        });
+        await ses.cookies.get({url: 'https://share.acgnx.se'}).then((cookies) => {
+          db.data.cookies[5].cookie.push(...cookies)
+        }).catch(err => {console.log(err)})
+        db.data.cookies[5].time = getCurrentTime()
+        db.data.cookies[5].status = '账号已登录'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else if ((response.data as string).includes('登錄密碼不正確')) {
+        db.data.cookies[5].time = getCurrentTime()
+        db.data.cookies[5].status = '账号密码错误'
+        await db.write()
+        mainWindowWebContent.send('refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+  }
+  catch (err) {
+    console.log(err)
   }
 }
 
@@ -1397,28 +1728,6 @@ async function setUAP(_event, UAPs: string) {
   await db.write()
 }
 
-//判断全部登录状态
-async function checkAllLoginStatus(_event) {
-  checkLoginStatus('bangumi').then(() => {
-    mainWindowWebContent.send('refreshLoginData')
-  })
-  checkLoginStatus('nyaa').then(() => {
-    mainWindowWebContent.send('refreshLoginData')
-  })
-  checkLoginStatus('acgrip').then(() => {
-    mainWindowWebContent.send('refresLoginhData')
-  })
-  checkLoginStatus('dmhy').then(() => {
-    mainWindowWebContent.send('refreshLoginData')
-  })
-  checkLoginStatus('acgnx_g').then(() => {
-    mainWindowWebContent.send('refreshLoginData')
-  })
-  checkLoginStatus('acgnx_a').then(() => {
-    mainWindowWebContent.send('refreshLoginData')
-  })
-}
-
 //删除任务
 async function removeTask(_event, index: number) {
   fs.rmSync(db.data.posts.find((item) => item.id == index)!.path, { recursive: true, force: true })
@@ -1478,10 +1787,6 @@ async function getPublishInfo(_event, id: number) {
 async function checkAccount(_event, type: string) {
   await checkLoginStatus(type)
   let result = db.data.cookies.find((item) => item.name == type)!.status
-  if (type == 'acgnx_a' && result == '防火墙阻止')
-    createLoginWindow('acgnx_a')
-  if (type == 'acgnx_g' && result == '防火墙阻止')
-    createLoginWindow('acgnx_g')
   return result
 }
 
@@ -1554,7 +1859,7 @@ async function getSiteInfo(_event, id: number) {
       if (info.reseed) 
         content += '<hr />\n\n请将旧链放于此\n\n'
       if (info.imageCredit != '') {
-        content += `Image Credit: <a href="${info.imageCredit}" rel="noopener" target="_blank">${info.imageLinks}</a>\n\n`
+        content += `Image Credit: <a href="${info.imageLinks}" rel="noopener" target="_blank">${info.imageCredit}</a>\n\n`
       }
       content += '<label for="medie-info-switch" class="btn btn-inverse-primary" title="展开MediaInfo">MediaInfo</label>\n\n'
       content += '<pre class="js-medie-info-detail medie-info-detail" style="display: none">\n'
@@ -1637,6 +1942,31 @@ async function getBTLinks(_event, id: number) {
       }
       await db.write()
     }
+    //重新尝试获取动漫花园的链接
+    if (storage.dmhy == '未找到链接') {
+      isFinished = 'false'
+      const config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
+      let postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+      let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
+      var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + rtitle)
+      let src = ''
+      for (let index = 0; index < 5; index++) {
+        let result = (postresult.data as string).match(rule)
+        if (result) {
+          src = result[1]
+          break
+        }
+        await sleep(1000)
+        postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+      }
+      if (src == '')
+        storage.dmhy = '未找到链接'
+      else {
+        storage.dmhy = 'https://www.dmhy.org' + src
+        isFinished = 'true'
+      }
+      await db.write()
+    }
     result.push(storage.bangumi ? storage.bangumi : '')
     result.push(storage.nyaa ? storage.nyaa : '')
     result.push(storage.acgrip ? storage.acgrip : '')
@@ -1675,7 +2005,9 @@ async function getSiteSrc(_event, id: number) {
 
 //清除缓存
 async function clearStorage(_event) {
-  await session.defaultSession.clearStorageData()
+  const partition = 'persist:login'
+  let ses = session.fromPartition(partition)
+  await ses.clearStorageData()
   db.data.cookies.forEach((item) =>{
     item.cookie = []
   })
@@ -1691,6 +2023,8 @@ function writeClipboard(_event, str: string) {
 //主窗口
 let mainWindowWebContent: Electron.WebContents
 function createWindow(): void {
+  
+  const partition = 'persist:main'
 
   const mainWindow = new BrowserWindow({
     width: 1150,
@@ -1702,10 +2036,67 @@ function createWindow(): void {
     titleBarStyle: 'hidden',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
+      partition: partition
     },
     icon: appIcon,
   })
   mainWindowWebContent = mainWindow.webContents
+  const ses = session.fromPartition(partition)
+
+  /*
+  拦截涉及ReCaptcha的请求，并篡改响应，这样处理因为reCaptcha只能在指定的域上工作，因此需要欺骗浏览器（不改变域名）。
+  参考https://www.electronjs.org/zh/docs/latest/api/net#netfetchinput-init
+  */
+  ses.protocol.handle('https', async (req) => {
+    try {
+      const {host, pathname} = new URL(req.url)
+      if (pathname == '/grecaptcha' && host == 'nyaa.si') {
+        const data = fs.readFileSync(nyaaResponse, {encoding: 'utf-8'})
+        return new Response(data, {
+          headers: { 'content-type': 'text/html' }
+        })
+      }
+      else if (pathname == '/grecaptcha' && host.includes('acgnx')) {
+        const data = fs.readFileSync(acgnxResponse, {encoding: 'utf-8'})
+        return new Response(data, {
+          headers: { 'content-type': 'text/html' }
+        })
+      }
+      else {
+        return net.fetch(req, { bypassCustomProtocolHandlers: true }) //跳过协议拦截，否则会造成无限递归
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return new Response('bad', {
+          status: 400,
+          headers: { 'content-type': 'text/html' }
+        })
+    }
+  })
+
+  // 拦截设置useragent和cookies
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    let type = ''
+    if (details.url.includes('bangumi.moe')) type = 'bangumi'
+    else if (details.url.includes('nyaa.si')) type = 'nyaa'
+    else if (details.url.includes('acg.rip')) type = 'acgrip'
+    else if (details.url.includes('dmhy.org')) type = 'dmhy'
+    else if (details.url.includes('share.acgnx.se')) type = 'acgnx_a'
+    else if (details.url.includes('www.acgnx.se')) type = 'acgnx_g'
+    else {
+      callback({ requestHeaders: details.requestHeaders})
+      return
+    }
+    const info = db.data.cookies.find(item => item.name == type) as LoginInfo
+    let str = ''
+    info.cookie.forEach(item => {
+      str += `${item.name}=${item.value}; `
+    })
+    details.requestHeaders['Cookie'] = str
+    details.requestHeaders['User-Agent'] = userAgent
+    callback({ requestHeaders: details.requestHeaders })
+  })
 
   //监听程序崩溃
   mainWindowWebContent.on('render-process-gone', (_e, detail) => {
@@ -1792,7 +2183,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('loadFromTxt', loadFromTxt)
   ipcMain.on('setProxyConfig', setProxyConfig)
   ipcMain.on('setUAP', setUAP)
-  ipcMain.on('checkLoginStatus', checkAllLoginStatus)
+  ipcMain.on('checkLoginStatus', checkLogin)
   ipcMain.on('removeTask', removeTask)
   ipcMain.on('clearStorage', clearStorage)
   ipcMain.on('writeClipboard', writeClipboard)
