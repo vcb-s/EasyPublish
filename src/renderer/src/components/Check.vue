@@ -1,6 +1,6 @@
 <script setup lang="ts" name="Check">
     import { defineProps, onMounted, ref, computed } from "vue"
-    import { Edit, RefreshRight } from '@element-plus/icons-vue'
+    import { Edit, RefreshRight, Upload } from '@element-plus/icons-vue'
     import { marked } from 'marked'
     import bbobHTML from '@bbob/html'
     import presetHTML5 from '@bbob/preset-html5'
@@ -79,6 +79,11 @@
             ElMessage.error('保存失败')
     }
 
+    //导出文件内容
+    async function exportContent() {
+        window.api.ExportContent(props.id, file_type.value)
+    }
+
     //跳转
     function toCreate() {
         router.push({
@@ -148,6 +153,9 @@
                                 </el-tooltip>
                                 <el-tooltip content="重新加载" placement="top">
                                     <el-button @click="getTaskInfo()" type="primary" :icon="RefreshRight" plain />
+                                </el-tooltip>
+                                <el-tooltip content="导出" placement="top">
+                                    <el-button @click="exportContent()" type="primary" :icon="Upload" plain />
                                 </el-tooltip>
                             </el-button-group>
                         </span>

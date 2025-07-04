@@ -81,6 +81,7 @@
     }
     //添加过往修正
     function addComments() {
+        if (oldComment.value == '') return
         content.value = content.value.replace(/(\[box\sstyle="info"\][\s\S]*?重发修正[\s\S]*?\[\/box\])/, '$1\n\n' + oldComment.value)
     }
 
@@ -108,7 +109,10 @@
         if (val) {
             rsID.value = val.id
             let raw = tableData.value.find(item => item.id == rsID.value)!.raw
-            mediaInfo.value = raw.match(/<pre[\s\S]*?>[\s]*([\s\S]*?)\s<\/pre>/)![1];
+            let info = raw.match(/<pre[\s\S]*?>[\s]*([\s\S]*?)\s<\/pre>/)
+            if (info) {
+                mediaInfo.value = info[1]
+            }
             let credit = raw.match(/Image\sCredit[\s\S]*?href="([\s\S]*?)"[\s\S]*?>([\s\S]*?)<\/a>/)
             if (credit)
                 [,credit_link.value,credit_name.value] = credit

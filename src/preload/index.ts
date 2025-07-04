@@ -22,7 +22,7 @@ const api = {
   OpenLoginWindow: (type: string) => ipcRenderer.send('openLoginWindow', type),
   RefreshLoginData: (loadData: () => void) => ipcRenderer.on('refreshLoginData', _event => loadData()),
   RefreshTaskData: (loadData: () => void) => ipcRenderer.on('refreshTaskData', _event => loadData()),
-  SetUAP: (UAPs: string) => ipcRenderer.send('setUAP', UAPs),
+  SaveAccountInfo: (info: string) => ipcRenderer.send('saveAccountInfo', info),
   CheckLoginStatus: (type: string, value?: string) => ipcRenderer.send('checkLoginStatus', type, value),
   RemoveTask: (index: number) => ipcRenderer.send('removeTask', index),
   GetAllTask: async () => await ipcRenderer.invoke('getAllTask'),
@@ -44,6 +44,7 @@ const api = {
   ImportCookies: (type: number) => ipcRenderer.send('importCookies', type),
   GetImageCaptcha: (loadImage: () => void) => ipcRenderer.on('loadIamgeCaptcha', _event => loadImage()),
   GetReCaptcha: (loadReCaptcha: (type: string) => void) => ipcRenderer.on('loadReCaptcha', (_event, type) => loadReCaptcha(type)),
+  ExportContent: (id: number, type: string) => ipcRenderer.send('exportContent', id, type),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

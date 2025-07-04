@@ -1,6 +1,6 @@
 <script setup lang="ts" name="Login">
     import { ref, reactive, onMounted } from "vue";
-    import type { Message_LoginInfo, Message_UAP } from '../index.d.ts'
+    import type { Message_LoginInfo, Message_AccountInfo } from '../index.d.ts'
     import { RefreshRight, Key, Delete } from '@element-plus/icons-vue'
 
     //设置滚动条区域高度
@@ -24,7 +24,7 @@
         index: number
         username: string
         password: string
-        cookies: {name: string, value: string}[]
+        enable: boolean
     }
     const tabledata = reactive<Tabledata[]>([{
         site: '萌番组',
@@ -33,8 +33,8 @@
         status: '',
         username: '',
         password: '',
+        enable: true,
         index: 1,
-        cookies: []
     },
     {
         site: 'Nyaa',
@@ -43,8 +43,8 @@
         status: '',
         username: '',
         password: '',
+        enable: true,
         index: 2,
-        cookies: []
     },
     {
         site: 'Acgrip',
@@ -53,8 +53,8 @@
         status: '',
         username: '',
         password: '',
+        enable: true,
         index: 3,
-        cookies: []
     },
     {
         site: '动漫花园',
@@ -63,8 +63,8 @@
         status: '',
         username: '',
         password: '',
+        enable: true,
         index: 4,
-        cookies: []
     },
     {
         site: 'AcgnX',
@@ -73,8 +73,8 @@
         status: '',
         username: '',
         password: '',
+        enable: true,
         index: 5,
-        cookies: []
     },
     {
         site: '末日动漫',
@@ -83,16 +83,16 @@
         status: '',
         username: '',
         password: '',
+        enable: true,
         index: 6,
-        cookies: []
     }])
     //加载数据
     async function loadData() {
         const result: Message_LoginInfo[] = JSON.parse(await window.api.GetLoginInfo())
         for (let index = 0; index < 6; index++) tabledata[index].time = result[index].time
-        for (let index = 0; index < 6; index++) tabledata[index].cookies = result[index].cookies
         for (let index = 0; index < 6; index++) tabledata[index].username = result[index].username
         for (let index = 0; index < 6; index++) tabledata[index].password = result[index].password
+        for (let index = 0; index < 6; index++) tabledata[index].enable = result[index].enable
         for (let index = 0; index < 6; index++) tabledata[index].status = result[index].status
     }
     window.api.RefreshLoginData(loadData)
@@ -129,12 +129,12 @@
     }
 
     //账户密码
-    async function setuap() {
-        let UAPs: Message_UAP[] = []
+    async function saveAccountInfo() {
+        let info: Message_AccountInfo[] = []
         tabledata.forEach(data => {
-            UAPs.push({username: data.username, password: data.password})
+            info.push({username: data.username, password: data.password, enable: data.enable})
         });
-        window.api.SetUAP(JSON.stringify(UAPs))
+        window.api.SaveAccountInfo(JSON.stringify(info))
     }
 
     //主站账户配置
@@ -245,11 +245,14 @@
                                     <el-col :span="1" />
                                     <el-col :span="22">
                                         <el-form label-width="auto">
+                                            <el-form-item label="启用账户">
+                                                <el-switch v-model="props.row.enable" active-text="启用" inactive-text="禁用" @change="saveAccountInfo" />
+                                            </el-form-item>
                                             <el-form-item label="用户名">
-                                                <el-input style="width: 300px;" @blur="setuap()" v-model="props.row.username" />
+                                                <el-input style="width: 300px;" @blur="saveAccountInfo" v-model="props.row.username" />
                                             </el-form-item>
                                             <el-form-item label="密码">
-                                                <el-input style="width: 300px;" @blur="setuap()" v-model="props.row.password" />
+                                                <el-input style="width: 300px;" @blur="saveAccountInfo" v-model="props.row.password" />
                                             </el-form-item>
                                         </el-form>
                                     </el-col>
