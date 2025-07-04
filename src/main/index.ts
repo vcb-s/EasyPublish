@@ -6,7 +6,7 @@ import type { PublishConfig,
   Content_text,
   Message_PublishStatus,
   Message_LoginInfo, 
-  Message_UAP,
+  Message_AccountInfo,
   ProxyConfig, 
   Message_rsPosts,
 } from '../renderer/src/index.d.ts'
@@ -27,32 +27,9 @@ import acgnxResponse from '../renderer/src/assets/acgnx.html?asset'
 import nyaaResponse from '../renderer/src/assets/nyaa.html?asset'
 import appIcon from '../../build/icon.ico?asset'
 
-/*
-                   _ooOoo_
-                  o8888888o
-                  88" . "88
-                  (| -_- |)
-                  O\  =  /O
-               ____/`---'\____
-             .'  \\|     |//  `.
-            /  \\|||  :  |||//  \
-           /  _||||| -:- |||||-  \
-           |   | \\\  -  /// |   |
-           | \_|  ''\---/''  |   |
-           \  .-\__  `-`  ___/-. /
-         ___`. .'  /--.--\  `. . __
-      ."" '<  `.___\_<|>_/___.'  >'"".
-     | | :  `- \`.;`\ _ /`;.`/ - ` : | |
-     \  \ `-.   \_ __\ /__ _/   .-` /  /
-======`-.____`-.___\_____/___.-`____.-'======
-                   `=---='
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-            佛祖保佑       永无BUG
-*/
-
 //应用数据管理及异常处理错误日志打印
 app.commandLine.appendSwitch('lang', 'zh-CN');
-const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.234 Safari/537.36'
+const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
 log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]{scope} {text}'
 const date = new Date()
 const dateStr = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
@@ -60,8 +37,8 @@ log.transports.file.resolvePathFn = ()=> app.getPath('userData') + '\\logs\\' + 
 log.initialize()
 console.log = log.log
 console.log(app.getPath('userData') + '\\logs\\' + dateStr + '.log')
-
 process.on('uncaughtException', (err) => {log.error(err)})
+
 type Storage = {
   id: number
   name: string
@@ -83,6 +60,7 @@ type LoginInfo = {
   status: string,
   username: string,
   password: string,
+  enable: boolean,
   cookie: Cookie[]
 }
 type Data = {
@@ -106,6 +84,7 @@ const defaultData: Data = { posts: [],
     status: '账号未登录',
     username: '',
     password: '',
+    enable: true,
     cookie: []
   },
   {
@@ -114,6 +93,7 @@ const defaultData: Data = { posts: [],
     status: '账号未登录',
     username: '',
     password: '',
+    enable: true,
     cookie: []
   },
   {
@@ -122,6 +102,7 @@ const defaultData: Data = { posts: [],
     status: '账号未登录',
     username: '',
     password: '',
+    enable: true,
     cookie: []
   },
   {
@@ -130,6 +111,7 @@ const defaultData: Data = { posts: [],
     status: '账号未登录',
     username: '',
     password: '',
+    enable: true,
     cookie: []
   },
   {
@@ -138,6 +120,7 @@ const defaultData: Data = { posts: [],
     status: '账号未登录',
     username: '',
     password: '',
+    enable: true,
     cookie: []
   },
   {
@@ -146,6 +129,7 @@ const defaultData: Data = { posts: [],
     status: '账号未登录',
     username: '',
     password: '',
+    enable: true,
     cookie: []
   },
 ]}
@@ -327,7 +311,8 @@ async function BTPublish(_event, id: number, type: string) {
       }
       else if (response.data.success === false && (response.data.message as string).includes('torrent same as')) {
         if (!storage.bangumi) {
-          storage.bangumi = '种子已存在'
+          let id = (response.data.message as string).slice(16)
+          storage.bangumi = 'https://bangumi.moe/torrent/' + id
           await db.write()
         }
         return 'exist'
@@ -359,7 +344,8 @@ async function BTPublish(_event, id: number, type: string) {
       }
       else if((response.data as string).includes('This torrent already exists')) {
         if (!storage.nyaa) {
-          storage.nyaa = '种子已存在'
+          let id = (response.data as string).match(/This\storrent\salready\sexists\s\(#(\d+)\)/)![1]
+          storage.nyaa = 'https://nyaa.si/view/' + id
           await db.write()
         }
         return 'exist'
@@ -397,7 +383,23 @@ async function BTPublish(_event, id: number, type: string) {
       if (response.status != 200) throw response
       if ((response.data as string).includes('種子已存在，請不要重複上傳')) {
         if (!storage.dmhy) {
-          storage.dmhy = '种子已存在'
+          let postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+          let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
+          var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + rtitle)
+          let src = ''
+          for (let index = 0; index < 5; index++) {
+            let result = (postresult.data as string).match(rule)
+            if (result) {
+              src = result[1]
+              break
+            }
+            await sleep(1000)
+            postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+          }
+          if (src == '')
+            storage.dmhy = '未找到链接'
+          else 
+            storage.dmhy = 'https://www.dmhy.org' + src
           await db.write()
         }
         return 'exist'
@@ -457,7 +459,8 @@ async function BTPublish(_event, id: number, type: string) {
       }
       if ((response.data as string).includes('閣下所要上載的Torrent檔案已存在')) {
         if (!storage.acgnx_a) {
-          storage.acgnx_a = '种子已存在'
+          let url = (response.data as string).match(/查看原資源詳情：<a\shref="([\S]*?)">/)![1]
+          storage.acgnx_a = 'https://share.acgnx.se/' + url
           await db.write()
         }
         return 'exist'
@@ -502,7 +505,8 @@ async function BTPublish(_event, id: number, type: string) {
       }
       if ((response.data as string).includes('The Torrent file you are going to upload is already there')) {
         if (!storage.acgnx_g) {
-          storage.acgnx_g = '种子已存在'
+          let url = (response.data as string).match(/View\soriginal\storrent\sdetails：<a\shref="([\S]*?)">/)![1]
+          storage.acgnx_g = 'https://www.acgnx.se/' + url
           await db.write()
         }
         return 'exist'
@@ -566,7 +570,26 @@ async function BTPublish(_event, id: number, type: string) {
       }
       if ((response.data as string).includes('已存在相同的种子')) {
         if (!storage.acgrip) {
-          storage.acgrip = '种子已存在'
+          let postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
+          let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
+          let rule = new RegExp('href="([\\S]*?)">' + rtitle)
+          let src = ''
+          for (let index = 0; index < 5; index++) {
+            let result = (postresult.data as string).match(rule)
+            if (result) {
+              src = result[1]
+              break
+            }
+            await sleep(1000)
+            cookievalue = postresult.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
+            db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))!.value = cookievalue
+            await db.write()
+            postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
+          }
+          if (src == '')
+            storage.acgrip = '未找到链接'
+          else
+            storage.acgrip = 'https://acg.rip' + src
           await db.write()
         }
         return 'exist'
@@ -761,14 +784,14 @@ function getCurrentTime() {
 }
 
 //响应前端检查
-async function checkLogin(_event, type: string, value?: string) {
+async function checkLogin(type: string, value?: string) {
   if (type == 'all') {
-    checkLoginStatus('bangumi')
-    checkLoginStatus('nyaa')
-    checkLoginStatus('dmhy')
-    checkLoginStatus('acgrip')
-    checkLoginStatus('acgnx_a')
-    checkLoginStatus('acgnx_g')
+    checkLogin('bangumi')
+    checkLogin('nyaa')
+    checkLogin('dmhy')
+    checkLogin('acgrip')
+    checkLogin('acgnx_a')
+    checkLogin('acgnx_g')
   }
   else {
     if (!value)
@@ -782,161 +805,168 @@ async function checkLogin(_event, type: string, value?: string) {
 //判断登陆状态
 async function checkLoginStatus(type: string) {
   try{
-    let url:string
-    if (type == 'bangumi') {
-      url = 'https://bangumi.moe/api/team/myteam'
-      let response = await axios.get(url, { responseType: 'text' })
-      for (let i = 0;i < 5;i++) {
-        if (response.status === 200) {
-          break
+    let item: LoginInfo = db.data.cookies.find(item => item.name === type)!
+    if (!item.enable) {
+      item.time = getCurrentTime()
+      item.status = '账户已禁用'
+    } 
+    else {
+      let url:string
+      if (type == 'bangumi') {
+        url = 'https://bangumi.moe/api/team/myteam'
+        let response = await axios.get(url, { responseType: 'text' })
+        for (let i = 0;i < 5;i++) {
+          if (response.status === 200) {
+            break
+          }
+          response = await axios.get(url, { responseType: 'text' })
         }
-        response = await axios.get(url, { responseType: 'text' })
-      }
-      const {data, status} = response
-      if (status != 200) {
-        throw response
-      }
-      if (data == '[]') {
-        db.data.cookies[0].time = getCurrentTime()
-        db.data.cookies[0].status = '账号未登录'
-      }
-      else {
-        db.data.cookies[0].time = getCurrentTime()
-        db.data.cookies[0].status = '账号已登录'
-      }
-    }
-    else if (type == 'nyaa') {
-      url = 'https://nyaa.si/profile'
-      let response = await axios.get(url, { responseType: 'text' })
-      for (let i = 0;i < 5;i++) {
-        if (response.status === 200 || response.status === 302) {
-          break
+        const {data, status} = response
+        if (status != 200) {
+          throw response
         }
-        response = await axios.get(url, { responseType: 'text' })
-      }
-      const {status} = response
-      if (status == 302) {
-        db.data.cookies[1].time = getCurrentTime()
-        db.data.cookies[1].status = '账号未登录'
-      }
-      else if (status == 200) {
-        db.data.cookies[1].time = getCurrentTime()
-        db.data.cookies[1].status = '账号已登录'
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'acgrip') {
-      url = 'https://acg.rip/cp'
-      let response = await axios.get(url, { responseType: 'text' })
-      for (let i = 0;i < 5;i++) {
-        if (response.status === 200 || response.status === 302) {
-          break
+        if (data == '[]') {
+          item.time = getCurrentTime()
+          item.status = '账号未登录'
         }
-        response = await axios.get(url, { responseType: 'text' })
-      }
-      const {status} = response
-      if (status == 302) {
-        db.data.cookies[2].time = getCurrentTime()
-        db.data.cookies[2].status = '账号未登录'
-      }
-      else if (status == 200) {
-        db.data.cookies[2].time = getCurrentTime()
-        db.data.cookies[2].status = '账号已登录'
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'dmhy') {
-      url = 'https://www.dmhy.org/user'
-      let response = await axios.get(url, { responseType: 'text' })
-      for (let i = 0;i < 5;i++) {
-        if (response.status === 200 || response.status === 302) {
-          break
+        else {
+          item.time = getCurrentTime()
+          item.status = '账号已登录'
         }
-        response = await axios.get(url, { responseType: 'text' })
       }
-      const {status} = response
-      if (status == 302) {
-        db.data.cookies[3].time = getCurrentTime()
-        db.data.cookies[3].status = '账号未登录'
-      }
-      else if (status == 200) {
-        db.data.cookies[3].time = getCurrentTime()
-        db.data.cookies[3].status = '账号已登录'
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'acgnx_g') {
-      url = 'https://www.acgnx.se/user.php'
-      let response = await axios.get(url, { responseType: 'text' })
-      for (let i = 0;i < 5;i++) {
-        if (response.status === 200 || response.status === 302 || response.status === 403) {
-          break
+      else if (type == 'nyaa') {
+        url = 'https://nyaa.si/profile'
+        let response = await axios.get(url, { responseType: 'text' })
+        for (let i = 0;i < 5;i++) {
+          if (response.status === 200 || response.status === 302) {
+            break
+          }
+          response = await axios.get(url, { responseType: 'text' })
         }
-        response = await axios.get(url, { responseType: 'text' })
+        const {status} = response
+        if (status == 302) {
+          item.time = getCurrentTime()
+          item.status = '账号未登录'
+        }
+        else if (status == 200) {
+          item.time = getCurrentTime()
+          item.status = '账号已登录'
+        }
+        else {
+          throw response
+        }
       }
-      const {data, status} = response
-      if (status == 302) {
-        db.data.cookies[4].time = getCurrentTime()
-        db.data.cookies[4].status = '账号未登录'
+      else if (type == 'acgrip') {
+        url = 'https://acg.rip/cp'
+        let response = await axios.get(url, { responseType: 'text' })
+        for (let i = 0;i < 5;i++) {
+          if (response.status === 200 || response.status === 302) {
+            break
+          }
+          response = await axios.get(url, { responseType: 'text' })
+        }
+        const {status} = response
+        if (status == 302) {
+          item.time = getCurrentTime()
+          item.status = '账号未登录'
+        }
+        else if (status == 200) {
+          item.time = getCurrentTime()
+          item.status = '账号已登录'
+        }
+        else {
+          throw response
+        }
       }
-      else if (status == 403) {
-        db.data.cookies[4].time = getCurrentTime()
-        db.data.cookies[4].status = '防火墙阻止'
-        createLoginWindow('acgnx_g')
+      else if (type == 'dmhy') {
+        url = 'https://www.dmhy.org/user'
+        let response = await axios.get(url, { responseType: 'text' })
+        for (let i = 0;i < 5;i++) {
+          if (response.status === 200 || response.status === 302) {
+            break
+          }
+          response = await axios.get(url, { responseType: 'text' })
+        }
+        const {status} = response
+        if (status == 302) {
+          item.time = getCurrentTime()
+          item.status = '账号未登录'
+        }
+        else if (status == 200) {
+          item.time = getCurrentTime()
+          item.status = '账号已登录'
+        }
+        else {
+          throw response
+        }
       }
-      else if (status == 200) {
-        if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
-          db.data.cookies[4].time = getCurrentTime()
-          db.data.cookies[4].status = '防火墙阻止'
+      else if (type == 'acgnx_g') {
+        url = 'https://www.acgnx.se/user.php'
+        let response = await axios.get(url, { responseType: 'text' })
+        for (let i = 0;i < 5;i++) {
+          if (response.status === 200 || response.status === 302 || response.status === 403) {
+            break
+          }
+          response = await axios.get(url, { responseType: 'text' })
+        }
+        const {data, status} = response
+        if (status == 302) {
+          item.time = getCurrentTime()
+          item.status = '账号未登录'
+        }
+        else if (status == 403) {
+          item.time = getCurrentTime()
+          item.status = '防火墙阻止'
           createLoginWindow('acgnx_g')
         }
-        else {
-          db.data.cookies[4].time = getCurrentTime()
-          db.data.cookies[4].status = '账号已登录'
-        }
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'acgnx_a') {
-      url = 'https://share.acgnx.se/user.php'
-      let response = await axios.get(url, { responseType: 'text' })
-      for (let i = 0;i < 5;i++) {
-        if (response.status === 200 || response.status === 302 || response.status === 403) {
-          break
-        }
-        response = await axios.get(url, { responseType: 'text' })
-      }
-      const {data, status} = response
-      if (status == 302) {
-        db.data.cookies[5].time = getCurrentTime()
-        db.data.cookies[5].status = '账号未登录'
-      }
-      else if (status == 403) {
-        db.data.cookies[5].time = getCurrentTime()
-        db.data.cookies[5].status = '防火墙阻止'
-        createLoginWindow('acgnx_a')
-      }
-      else if (status == 200) {
-        if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
-          db.data.cookies[5].time = getCurrentTime()
-          db.data.cookies[5].status = '防火墙阻止'
-        createLoginWindow('acgnx_a')
+        else if (status == 200) {
+          if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
+            item.time = getCurrentTime()
+            item.status = '防火墙阻止'
+            createLoginWindow('acgnx_g')
+          }
+          else {
+            item.time = getCurrentTime()
+            item.status = '账号已登录'
+          }
         }
         else {
-          db.data.cookies[5].time = getCurrentTime()
-          db.data.cookies[5].status = '账号已登录'
+          throw response
         }
       }
-      else {
-        throw response
+      else if (type == 'acgnx_a') {
+        url = 'https://share.acgnx.se/user.php'
+        let response = await axios.get(url, { responseType: 'text' })
+        for (let i = 0;i < 5;i++) {
+          if (response.status === 200 || response.status === 302 || response.status === 403) {
+            break
+          }
+          response = await axios.get(url, { responseType: 'text' })
+        }
+        const {data, status} = response
+        if (status == 302) {
+          item.time = getCurrentTime()
+          item.status = '账号未登录'
+        }
+        else if (status == 403) {
+          item.time = getCurrentTime()
+          item.status = '防火墙阻止'
+          createLoginWindow('acgnx_a')
+        }
+        else if (status == 200) {
+          if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
+            item.time = getCurrentTime()
+            item.status = '防火墙阻止'
+          createLoginWindow('acgnx_a')
+          }
+          else {
+            item.time = getCurrentTime()
+            item.status = '账号已登录'
+          }
+        }
+        else {
+          throw response
+        }
       }
     }
     await db.write()
@@ -1266,15 +1296,6 @@ async function BTLogin(type: string, value?: string) {
   }
 }
 
-//访问cookie信息
-function getCookies(type: string) {
-  const info = db.data.cookies.find(item => item.name == type) as LoginInfo
-  let result: {name: string, value: string}[] = []
-  info.cookie.forEach(item => {
-      result.push({name: item.name, value: item.value})
-  })
-  return result
-}
 //获取登录信息
 async function getLoginInfo(_event) {
   let result: Message_LoginInfo[] = []
@@ -1286,7 +1307,7 @@ async function getLoginInfo(_event) {
       status: item.status, 
       username: item.username, 
       password: item.password, 
-      cookies: getCookies(item.name)
+      enable: item.enable,
     })
   })
   return JSON.stringify(result)
@@ -1502,7 +1523,7 @@ async function createWithText(_event, id: number, config_: string) {
     }
     if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
     if (info.nomination) {
-      content += '本番由 <strong>组员提名</strong> ，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。<br />\n'
+      content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。<br />\n'
       content += 'This project was <strong>nominated by our members</strong> and produced upon request. Thanks to them for their selfless dedication to the development of VCB-Studio.<br />\n<br />\n'
     }
     let team_Ch = '', team_En = ''
@@ -1514,7 +1535,7 @@ async function createWithText(_event, id: number, config_: string) {
       team_Ch = team_Ch.slice(0, -3)
       team_En = team_En.slice(0, -3)
       content += `这个项目与 <strong>${team_Ch}</strong> 合作，感谢他们精心制作的字幕。<br />\n`
-      content += `This project is in collaboration with <strong>${team_En}</strong>. Thanks to them for elaborating Chinese subtitles.<br />\n<br />\n`
+      content += `This project is in collaboration with <strong>${team_En}</strong>. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
     }
     let comment_Ch = info.comment_Ch.split('\n')
     let comment_En = info.comment_En.split('\n')
@@ -1565,9 +1586,9 @@ async function createWithText(_event, id: number, config_: string) {
     }
     if (!info.reseed) {
       content += ' VCB-Studio 已不再保证收集作品相关 CD 和扫图资源，详情请参见 <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a>。<br />\n'
-      content += 'Please refer to <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a> for more information about that VCB-Studio will no longer guarantee to include relevant CDs and scans.<br />\n<br />\n'
+      content += 'Please refer to <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a> on VCB-Studio no longer guaranteeing the inclusion of relevant CDs and scans.<br />\n<br />\n'
       content += '本组（不）定期招募新成员。详情请参见 <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a>。<br />\n'
-      content += 'Please refer to <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a> about information of our (un)scheduled recruitment.<br />\n<br />\n'
+      content += 'Please refer to <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a> for information on our (un)scheduled recruitment.<br />\n<br />\n'
     }
     content += '播放器教程索引： <a href="https://vcb-s.com/archives/16639" target="_blank">VCB-Studio 播放器推荐</a><br />\n'
     content += '中文字幕分享区： <a href="https://bbs.acgrip.com/" target="_blank">Anime 分享论坛</a><br />\n'
@@ -1636,7 +1657,7 @@ async function loadFromTxt(_event) {
   let md = content.match(/\[!\[\]\([\s\S]*\)\s\s/)![0]
   let bbcode = content.match(/\[URL=[\s\S]*\[\/URL\]/)![0]
   const str = 'Comparison (right click on the image and open it in a new tab to see the full-size one)\n'
-            + 'Source________________________________________________Encode\n\n' 
+            + content.match(/<br\/>[\s\S]*?<br\/>/)![0].slice(5).slice(0, -5).trim() + '\n\n' 
   html += '\n'
   md = str + md
   bbcode = str + bbcode + '\n'
@@ -1698,32 +1719,33 @@ async function saveFileContent(_event, id: number, type: string, content: string
   }
 }
 
+async function exportContent(_event, id: number, type: string) {
+  let post = db.data.posts.find(item => item.id == id)!
+  const {canceled, filePath} = await dialog.showSaveDialog({defaultPath: post.name,filters: [{name: type, extensions: [type]}]})
+  if (canceled) return
+  let filename = ''
+  if (type == 'html') filename = '/bangumi.html'
+  if (type == 'md') filename = '/nyaa.md'
+  if (type == 'bbcode') filename = '/acgrip.bbcode'
+  fs.copyFileSync(post.path + filename, filePath)
+}
+
 //保存代理设置
 async function setProxyConfig(_event, config: string) {
   let pconf = JSON.parse(config)
   db.data.proxyConfig = pconf
   await db.write()
-  //配置axios代理
-  if (pconf.status) {
-    if (pconf.type == "socks") {
-      axios.defaults.httpsAgent = new socksProxy.SocksProxyAgent(`socks://${pconf.host}:${pconf.port}`)
-    }
-    else{
-      axios.defaults.proxy = {
-        protocol: pconf.type,
-        port: pconf.port,
-        host: pconf.host
-      }
-    }
-  }
+  app.relaunch()
+  app.exit()
 }
 
 //保存用户密码
-async function setUAP(_event, UAPs: string) {
-  const result: Message_UAP[] = JSON.parse(UAPs)
+async function saveAccountInfo(_event, info: string) {
+  const result: Message_AccountInfo[] = JSON.parse(info)
   for (let index = 0; index < 6; index++) {
     db.data.cookies[index].username = result[index].username
     db.data.cookies[index].password = result[index].password
+    db.data.cookies[index].enable = result[index].enable
   }
   await db.write()
 }
@@ -1825,6 +1847,8 @@ async function getSiteInfo(_event, id: number) {
                 + `${info.encoding} ${info.torrent_type} [${note}]`
       result.push(title)
       let team_Ch = '', content = ''
+      if (info.nomination)
+        content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。\n\n'
       if (info.subTeam_Ch) {
         info.subTeam_Ch.forEach(item => { team_Ch += item + ' & ' })
       }
@@ -2182,13 +2206,14 @@ app.whenReady().then(async () => {
   ipcMain.handle('searchPosts', searchPosts)
   ipcMain.handle('loadFromTxt', loadFromTxt)
   ipcMain.on('setProxyConfig', setProxyConfig)
-  ipcMain.on('setUAP', setUAP)
-  ipcMain.on('checkLoginStatus', checkLogin)
+  ipcMain.on('saveAccountInfo', saveAccountInfo)
+  ipcMain.on('checkLoginStatus', (_event, type: string, value: string) => checkLogin(type, value))
   ipcMain.on('removeTask', removeTask)
   ipcMain.on('clearStorage', clearStorage)
   ipcMain.on('writeClipboard', writeClipboard)
   ipcMain.on('exportCookies', exportCookies)
   ipcMain.on('importCookies', importCookies)
+  ipcMain.on('exportContent', exportContent)
 
   //配置axios代理
   let pconf = db.data.proxyConfig

@@ -74,12 +74,13 @@ export interface Message_LoginInfo{
   status: string
   username: string
   password: string
-  cookies: {name: string, value: string}[]
+  enable: boolean
 }
 
-export interface Message_UAP{
+export interface Message_AccountInfo{
   username: string
   password: string
+  enable: boolean
 }
 
 export interface Message_TaskInfo {

@@ -29,11 +29,10 @@
   })
 
   //人机验证对话框
-  const site = ref('')
   const imageDialogVisible = ref(false)
-  const reCaptchaDialogVisible = ref(false)
-  const dialogTitle = ref('')
-  const grecaptchaSrc = ref('')
+  const reCaptchaDialogVisible_nyaa = ref(false)
+  const reCaptchaDialogVisible_acgnx_a = ref(false)
+  const reCaptchaDialogVisible_acgnx_g = ref(false)
   const imgSrc = ref('')
   const imgCaptcha = ref('')
   const reCaptcha = ref('')
@@ -41,26 +40,19 @@
   window.api.GetImageCaptcha(refreshImage)
   async function refreshImage() {
     imageDialogVisible.value = true
-    site.value = 'dmhy'
-    dialogTitle.value = '登录到动漫花园'
     imgSrc.value = 'https://www.dmhy.org/common/generate-captcha?code=' + Date.now()
   }
   //处理reCaptcha验证
   async function setReCaptcha(type: string) {
-    site.value = type
     if (type == 'nyaa') {
-      grecaptchaSrc.value = 'https://nyaa.si/grecaptcha'
-      dialogTitle.value = '登录到Nyaa'
+      reCaptchaDialogVisible_nyaa.value = true
     }
     if (type == 'acgnx_g') {
-      grecaptchaSrc.value = 'https://www.acgnx.se/grecaptcha'
-      dialogTitle.value = '登录到AcgnX'
+      reCaptchaDialogVisible_acgnx_g.value = true
     }
     if (type == 'acgnx_a') {
-      grecaptchaSrc.value = 'https://share.acgnx.se/grecaptcha'
-      dialogTitle.value = '登录到末日动漫'
+      reCaptchaDialogVisible_acgnx_a.value = true
     }
-    reCaptchaDialogVisible.value = true
   }
   window.api.GetReCaptcha(setReCaptcha)
   window.addEventListener('message', e => {
@@ -69,14 +61,13 @@
     }
   })
   //提交验证码
-  async function submitCaptcha() {
-    if (site.value == 'dmhy'){
+  async function submitCaptcha(type: string) {
+    if (type == 'dmhy'){
       window.api.CheckLoginStatus('dmhy', imgCaptcha.value)
       imageDialogVisible.value = false
     }
     else {
-      window.api.CheckLoginStatus(site.value, reCaptcha.value)
-      reCaptchaDialogVisible.value = false
+      window.api.CheckLoginStatus(type, reCaptcha.value)
     }
   }
 </script>
@@ -85,7 +76,7 @@
   <div class="layout">
     <!--登录人机验证对话框-->
     <!-- 图形验证码 -->
-    <el-dialog v-model="imageDialogVisible" destroy-on-close :title="dialogTitle" width="220">
+    <el-dialog v-model="imageDialogVisible" destroy-on-close title="登录到动漫花园" width="220">
       <el-row>
         <img :src="imgSrc" style="width: 100px; margin-right: 10px;" />
         <el-button link type="primary" size="small" @click="refreshImage">换一张</el-button>
@@ -93,17 +84,35 @@
       <el-row style="height: 20px;" />
       <el-row>
         <el-input v-model="imgCaptcha" style="width: 100px; margin-right: 10px;" />
-        <el-button type="primary" @click="submitCaptcha">确认</el-button>
+        <el-button type="primary" @click="submitCaptcha('dmhy')">确认</el-button>
       </el-row>
     </el-dialog>
     <!-- reCaptcha验证码 -->
-    <el-dialog v-model="reCaptchaDialogVisible" destroy-on-close :title="dialogTitle" width="360">
+    <el-dialog v-model="reCaptchaDialogVisible_nyaa" destroy-on-close title="登录到Nyaa" width="360">
       <el-row>
-        <iframe :src="grecaptchaSrc" style="height: 500px;width: 350px;"></iframe>
+        <iframe src="https://nyaa.si/grecaptcha" style="height: 500px;width: 350px;"></iframe>
       </el-row>
       <el-row style="height: 20px;" />
       <el-row>
-        <el-button type="primary" @click="submitCaptcha">确认</el-button>
+        <el-button type="primary" @click="submitCaptcha('nyaa'); reCaptchaDialogVisible_nyaa = false">确认</el-button>
+      </el-row>
+    </el-dialog>
+    <el-dialog v-model="reCaptchaDialogVisible_acgnx_g" destroy-on-close title="登录到AcgnX" width="360">
+      <el-row>
+        <iframe src="https://www.acgnx.se/grecaptcha" style="height: 500px;width: 350px;"></iframe>
+      </el-row>
+      <el-row style="height: 20px;" />
+      <el-row>
+        <el-button type="primary" @click="submitCaptcha('acgnx_g'); reCaptchaDialogVisible_acgnx_g = false">确认</el-button>
+      </el-row>
+    </el-dialog>
+    <el-dialog v-model="reCaptchaDialogVisible_acgnx_a" destroy-on-close title="登录到末日动漫" width="360">
+      <el-row>
+        <iframe src="https://share.acgnx.se/grecaptcha" style="height: 500px;width: 350px;"></iframe>
+      </el-row>
+      <el-row style="height: 20px;" />
+      <el-row>
+        <el-button type="primary" @click="submitCaptcha('acgnx_a'); reCaptchaDialogVisible_acgnx_a = false">确认</el-button>
       </el-row>
     </el-dialog>
     <el-container style="height: 100%">

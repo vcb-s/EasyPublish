@@ -303,6 +303,10 @@
         {
             label: 'LIVE',
             value: 'LIVE'
+        },
+        {
+            label: 'TV',
+            value: 'TV'
         }
     ])
     //设置字幕信息
@@ -498,7 +502,6 @@
             config.subTeam_Ch!.push(value[0])
             config.subTeam_En!.push(value[1])
         })
-        getBangumiTags()
     }
     //设置Bangumi分类
     const BangumiOptions = [
