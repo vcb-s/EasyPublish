@@ -7,8 +7,11 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    Account: typeof import('./src/components/Account.vue')['default']
+    BTPublish: typeof import('./src/components/BTPublish.vue')['default']
     Check: typeof import('./src/components/Check.vue')['default']
     Create: typeof import('./src/components/Create.vue')['default']
+    CreateTask: typeof import('./src/components/CreateTask.vue')['default']
     Edit: typeof import('./src/components/Edit.vue')['default']
     ElAside: typeof import('element-plus/es')['ElAside']
     ElButton: typeof import('element-plus/es')['ElButton']
@@ -19,6 +22,7 @@ declare module 'vue' {
     ElCollapseItem: typeof import('element-plus/es')['ElCollapseItem']
     ElContainer: typeof import('element-plus/es')['ElContainer']
     ElDialog: typeof import('element-plus/es')['ElDialog']
+    ElFooter: typeof import('element-plus/es')['ElFooter']
     ElForm: typeof import('element-plus/es')['ElForm']
     ElFormItem: typeof import('element-plus/es')['ElFormItem']
     ElHeader: typeof import('element-plus/es')['ElHeader']
@@ -45,6 +49,7 @@ declare module 'vue' {
     ElTableColumn: typeof import('element-plus/es')['ElTableColumn']
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     Finish: typeof import('./src/components/Finish.vue')['default']
+    ForumPublish: typeof import('./src/components/ForumPublish.vue')['default']
     Home: typeof import('./src/components/Home.vue')['default']
     Localtask: typeof import('./src/components/Localtask.vue')['default']
     Login: typeof import('./src/components/Login.vue')['default']
@@ -54,6 +59,8 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     Site: typeof import('./src/components/Site.vue')['default']
+    Task: typeof import('./src/components/Task.vue')['default']
+    TaskList: typeof import('./src/components/TaskList.vue')['default']
   }
   export interface ComponentCustomProperties {
     vLoading: typeof import('element-plus/es')['ElLoadingDirective']

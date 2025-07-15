@@ -1,14 +1,13 @@
-<script setup lang="ts">
+<script setup lang="ts" name="CreateTask">
     import { reactive, ref, onMounted } from "vue"
     import type { FormInstance, FormRules, } from 'element-plus'
-    import type { PublishConfig } from '../index.d.ts'
     import { useRouter } from "vue-router";
     
     //设置表单
     interface ruleForm {
         name: string
         path: string
-        type: "quick" | "file" | "text"
+        type: "quick" | "file" | "template"
     }
     const createForm = ref()
     const form = reactive<ruleForm>({
@@ -27,7 +26,7 @@
             label: '从文件创建'
         },
         {
-            value: 'text',
+            value: 'template',
             label: '从模板创建'
         }
     ]
@@ -53,8 +52,8 @@
     const isLoading = ref(false)
     async function loadFolder() {
         isLoading.value = true
-        const folder = await window.api.OpenFile('folder')
-        form.path = folder
+        const { path }: Message.Global.Path = JSON.parse(await window.globalAPI.getFolderPath())
+        form.path = path
         isLoading.value = false
     }
 
@@ -63,7 +62,7 @@
     const clientHeight = ref(0)
     function setHeight() {
         clientHeight.value =  document.documentElement.clientHeight;
-        slbHeight.value = clientHeight.value - 50 + 'px';
+        slbHeight.value = clientHeight.value - 60 + 'px';
     }
     onMounted(()=>{
         setHeight()
@@ -78,17 +77,8 @@
         isCreating.value = true
         await formEl.validate(async (valid, _fields) => {
             if (valid) {
-                const config: PublishConfig = {
-                    type: form.type,
-                    name: form.name,
-                    torrent: '',
-                    information: 'https://vcb-s.com/archives/138',
-                    title: '',
-                    category_bangumi: '',
-                    category_nyaa: '',
-                    tag: []
-                }
-                const result = await window.api.CreateTask(form.path, config)
+                let msg: Message.Task.TaskConfig = form
+                const { result }: Message.Task.Result = JSON.parse(await window.taskAPI.createTask(JSON.stringify(msg)))
                 if (result.includes('success')) {
                     ElMessage({
                         message: '创建成功，即将跳转',
@@ -98,7 +88,7 @@
                     let [,id] = result.split(':')
                     setTimeout(() => {
                         router.push({
-                            name: 'create',
+                            name: 'edit',
                             params: { id: id }
                         })
                     }, 500);

@@ -1,7 +1,6 @@
-<script setup lang="ts" name="Publish">
-    import { defineProps, onMounted, ref, reactive } from "vue"
+<script setup lang="ts" name="BTPublish">
+    import { onMounted, ref, reactive } from "vue"
     import { useRouter } from 'vue-router'
-    import type {Message_PublishStatus} from '../index.d.ts'
     import type { TableInstance } from 'element-plus'
 
     const props = defineProps<{id: number}>()
@@ -13,7 +12,7 @@
     const clientHeight = ref(0)
     function setHeight() {
         clientHeight.value =  document.documentElement.clientHeight;
-        slbHeight.value = clientHeight.value - 117 + 'px';
+        slbHeight.value = clientHeight.value - 137 + 'px';
     }
     function setscrollbar() {
         setHeight()
@@ -23,13 +22,13 @@
     //路由跳转
     function back() {
         router.push({
-            name: type ? 'create' : 'check',
+            name: type ? 'edit' : 'check',
             params: {id: props.id}
         })
     }
     function next() {
         router.push({
-            name: type ? 'finish' : 'site',
+            name: type ? 'finish' : 'forum_publish',
             params: {id: props.id}
         })
     }
@@ -112,51 +111,37 @@
 
     //加载已发布信息
     async function loadData() {
-        const {status} = await window.api.OpenTask(props.id)
-        type = status == 'quick'
-        const publishedSites: Message_PublishStatus[]  = JSON.parse(await window.api.GetPublishInfo(props.id))
-        publishedSites.forEach((item => {
-            if (item.site == 'bangumi') {
-                if (item.status == '发布完成') {
-                    tabledata[0].status = '发布完成'
-                    tabledata[0].class = 'success-row'
-                    tabledata[1].status = '发布完成'
-                    tabledata[1].class = 'success-row'
-                }
-                else if (item.status == '种子已存在') {
-                    tabledata[0].status = '种子已存在'
-                    tabledata[0].class = 'danger-row'
-                    tabledata[1].status = '种子已存在'
-                    tabledata[1].class = 'danger-row'
-                }
+        let msg: Message.Task.TaskID = { id: props.id }
+        let result: Message.Task.PublishStatus = JSON.parse(await window.taskAPI.getPublishStatus(JSON.stringify(msg)))
+        let keys = Object.keys(result)
+        keys.forEach(item => {
+            if (result[item] == '发布完成') {
+                tabledata.find(item_ => item_.type == item)!.status = '发布完成'
+                tabledata.find(item_ => item_.type == item)!.class = 'success-row'
             }
-            else{
-                if (item.status == '发布完成') {
-                    tabledata.find((item_) => item_.type == item.site)!.status = '发布完成'
-                    tabledata.find((item_) => item_.type == item.site)!.class = 'success-row'
-                }
-                else if (item.status == '种子已存在') {
-                    tabledata.find((item_) => item_.type == item.site)!.status = '种子已存在'
-                    tabledata.find((item_) => item_.type == item.site)!.class = 'danger-row'
-                }
+            else if (result[item] == '种子已存在') {
+                tabledata.find(item_ => item_.type == item)!.status = '种子已存在'
+                tabledata.find(item_ => item_.type == item)!.class = 'danger-row'
             }
-        }))
+        })
     }
     
     //发布
     async function publish(index: number) {
         tabledata[index].lock = true
         tabledata[index].status = '正在检查账户登录'
-        const result = await window.api.CheckAccount(index == 0 ? 'bangumi' : tabledata[index].type)
-        if (result != '账号已登录') {
-            tabledata[index].status = result
+        let msg: Message.BT.AccountType = {type: index == 0 ? 'bangumi' : tabledata[index].type}
+        const { status }: Message.BT.LoginStatus = JSON.parse(await window.BTAPI.checkLoginStatus(JSON.stringify(msg)))
+        if (status != '账号已登录') {
+            tabledata[index].status = status
             tabledata[index].class = 'warning-row'
             return
         }
         tabledata[index].status = '检查完成正在发布'
-        let res = await window.api.Publish(props.id, tabledata[index].type)
+        let message: Message.Task.ContentType = { id: props.id, type: tabledata[index].type}
         for (let i = 1;i < 6;i++) {
-            if (res == 'success') {
+            let { result }: Message.Task.Result = JSON.parse(await window.BTAPI.publish(JSON.stringify(message)))
+            if (result == 'success') {
                 tabledata[index].lock = false
                 tabledata[index].status = '发布完成'
                 tabledata[index].class = 'success-row'
@@ -164,28 +149,15 @@
                 loadData()
                 return
             }
-            if (res == 'exist') {
+            if (result == 'exist') {
                 tabledata[index].lock = false
                 tabledata[index].status = '种子已存在'
                 tabledata[index].class = 'danger-row'
                 return
             }
-            if (res == 'noSuchFile_torrent') {
-                tabledata[index].lock = false
-                tabledata[index].status = '未找到种子文件'
-                tabledata[index].class = 'danger-row'
-                return
-            }
-            if (res.includes('noSuchFile')) {
-                tabledata[index].lock = false
-                tabledata[index].status = '未找到文件'
-                tabledata[index].class = 'danger-row'
-                return
-            }
-            if (res == 'failed') {
+            if (result == 'failed') {
                 tabledata[index].status = '发布失败正在重试（' + i + '/5)'
-                tabledata[index].class = 'warning-row'
-                res = await window.api.Publish(props.id, tabledata[index].type)
+                tabledata[index].class = 'warning-row';
             }
         }
         tabledata[index].lock = false
@@ -204,8 +176,13 @@
     //设置颜色
     const tableRowClassName = ({ rowIndex }: { rowIndex: number }) => tabledata[rowIndex].class
 
-    onMounted(() => {
+    onMounted(async () => {
         setscrollbar()
+        let msg: Message.Task.TaskID = { id: props.id }
+        let taskType: Message.Task.TaskType = JSON.parse(await window.taskAPI.getTaskType(JSON.stringify(msg)))
+        type = taskType.type == 'quick'
+        let message: Message.Task.TaskStatus = { id: props.id, step: 'bt_publish' }
+        window.taskAPI.setTaskProcess(JSON.stringify(message))
         loadData()
     })
 

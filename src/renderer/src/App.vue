@@ -8,9 +8,18 @@
   document.body.style.overflow = "hidden";
 
   //窗口控制
-  function WinClose() { window.api.WinHandle("close") }
-  function WinMini() { window.api.WinHandle("mini") }
-  function WinMax() { window.api.WinHandle("max") }
+  function winClose() { 
+    let command: Message.Global.WinHandle = { command: "close" }
+    window.globalAPI.winHandle(JSON.stringify(command)) 
+  }
+  function winMini() { 
+    let command: Message.Global.WinHandle = { command: "mini" }
+    window.globalAPI.winHandle(JSON.stringify(command)) 
+  }
+  function winMax() { 
+    let command: Message.Global.WinHandle = { command: "max" }
+    window.globalAPI.winHandle(JSON.stringify(command)) 
+  }
 
   //设置代理
   const visible = ref(false)
@@ -20,12 +29,14 @@
     host: '',
     port: 8080
   })
-  function save() {
-    window.api.SetProxyConfig(JSON.stringify(form))
+  function setProxyConfig() {
+    let msg: Message.Global.ProxyConfig = form
+    window.globalAPI.setProxyConfig(JSON.stringify(msg))
     visible.value = false
   }
   onMounted(async () => {
-    Object.assign(form, JSON.parse(await window.api.GetProxyConfig()))
+    let msg: Message.Global.ProxyConfig = JSON.parse(await window.globalAPI.getProxyConfig())
+    Object.assign(form, msg)
   })
 
   //人机验证对话框
@@ -35,15 +46,16 @@
   const reCaptchaDialogVisible_acgnx_g = ref(false)
   const imgSrc = ref('')
   const imgCaptcha = ref('')
-  const reCaptcha = ref('')
+  let reCaptcha = {nyaa: '', acgnx_a: '', acgnx_g: ''}
   //图片验证码处理
-  window.api.GetImageCaptcha(refreshImage)
   async function refreshImage() {
     imageDialogVisible.value = true
     imgSrc.value = 'https://www.dmhy.org/common/generate-captcha?code=' + Date.now()
   }
+  window.BTAPI.loadImageCaptcha(refreshImage)
   //处理reCaptcha验证
-  async function setReCaptcha(type: string) {
+  async function setReCaptcha(msg: string) {
+    let { type } = JSON.parse(msg) as Message.BT.ReCaptchaType
     if (type == 'nyaa') {
       reCaptchaDialogVisible_nyaa.value = true
     }
@@ -54,20 +66,27 @@
       reCaptchaDialogVisible_acgnx_a.value = true
     }
   }
-  window.api.GetReCaptcha(setReCaptcha)
+  window.BTAPI.loadReCaptcha(setReCaptcha)
   window.addEventListener('message', e => {
-    if (e.origin == 'https://nyaa.si' || e.origin == 'https://www.acgnx.se' || e.origin == 'https://share.acgnx.se') {
-      reCaptcha.value = e.data
-    }
+    let type = ''
+    if (e.origin == 'https://nyaa.si')
+      type = 'nyaa'
+    if (e.origin == 'https://www.acgnx.se')
+      type = 'acgnx_g'
+    if (e.origin == 'https://share.acgnx.se')
+      type = 'acgnx_a'
+    reCaptcha[type] = e.data
   })
   //提交验证码
   async function submitCaptcha(type: string) {
     if (type == 'dmhy'){
-      window.api.CheckLoginStatus('dmhy', imgCaptcha.value)
+      let msg: Message.BT.Captcha = {type: 'dmhy', key: imgCaptcha.value}
+      window.BTAPI.loginAccount(JSON.stringify(msg))
       imageDialogVisible.value = false
     }
     else {
-      window.api.CheckLoginStatus(type, reCaptcha.value)
+      let msg: Message.BT.Captcha = {type: type, key: reCaptcha[type]}
+      window.BTAPI.loginAccount(JSON.stringify(msg))
     }
   }
 </script>
@@ -120,15 +139,15 @@
       <el-header class="header">
         &nbsp;EasyPublish
         <el-button text circle type="danger" 
-        style="position: absolute; right: 10px;" @click="WinClose">
+        style="position: absolute; right: 10px;" @click="winClose">
           <el-icon :size="30"><Close /></el-icon>
         </el-button>
         <el-button text circle type="info" 
-        style="position: absolute; right: 50px;" @click="WinMax">
+        style="position: absolute; right: 50px;" @click="winMax">
           <el-icon :size="25"><FullScreen /></el-icon>
         </el-button>
         <el-button text circle type="info" 
-        style="position: absolute; right: 90px;" @click="WinMini">
+        style="position: absolute; right: 90px;" @click="winMini">
           <el-icon :size="29"><Minus /></el-icon>
         </el-button>
         <el-switch v-model="isDark" style="position: absolute; right: 180px; 
@@ -161,7 +180,7 @@
                 <el-input-number v-model="form.port" />
               </el-form-item>
               <el-form-item>
-                <el-button type="primary" @click="save()">保存</el-button>
+                <el-button type="primary" @click="setProxyConfig()">保存</el-button>
                 <el-button @click="visible = false">取消</el-button>
               </el-form-item>
             </el-form>
@@ -176,11 +195,11 @@
       <el-container>
         <el-aside width="200px">
           <el-menu default-active="2" class="el-menu-vertical" :router="true">
-            <el-menu-item index="/new">
+            <el-menu-item index="/create_task">
               <el-icon><DocumentAdd /></el-icon>
               <span>创建新任务</span>
             </el-menu-item>
-            <el-menu-item index="/localtask">
+            <el-menu-item index="/task_list">
               <el-icon><FolderOpened /></el-icon>
               <span>管理本地任务</span>
             </el-menu-item>
@@ -188,7 +207,7 @@
               <el-icon><Memo /></el-icon>
               <span>管理线上任务</span>
             </el-menu-item>
-            <el-menu-item index="/login">
+            <el-menu-item index="/account">
               <el-icon><Key /></el-icon>
               <span>登录管理</span> 
             </el-menu-item>
@@ -198,9 +217,12 @@
             </el-menu-item>
           </el-menu>
         </el-aside>
-        <el-main>
-          <RouterView></RouterView>
-        </el-main>
+        <el-container>
+          <el-main>
+            <RouterView></RouterView>
+          </el-main>
+          <el-footer height="10px"></el-footer>
+        </el-container>
       </el-container>
     </el-container>
   </div>

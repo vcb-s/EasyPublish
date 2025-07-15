@@ -1,27 +1,31 @@
 <script setup lang="ts" name="Finish">
-    import { defineProps, onMounted, ref } from "vue"
+    import { onMounted, ref } from "vue"
     import { useRouter } from 'vue-router'
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
 
     const src = ref('')
-    let type = false
+    let type = ''
 
     function back() {
         router.push({
-            name: type ? 'publish' : 'site',
+            name: type ? 'bt_publish' : 'forum_publish',
             params: {id: props.id}
         })
     }
 
     async function loadData() {
-        const {status} = await window.api.OpenTask(props.id)
-        type = status == 'quick'
-        src.value = await window.api.GetSiteSrc(props.id)
+        let msg: Message.Task.TaskID = { id: props.id }
+        let taskType: Message.Task.TaskType = JSON.parse(await window.taskAPI.getTaskType(JSON.stringify(msg)))
+        type = taskType.type
+        let forumLink: Message.Task.ForumLink = JSON.parse(await window.taskAPI.getForumLink(JSON.stringify(msg)))
+        if (forumLink.link) src.value = forumLink.link
     }
 
     onMounted(() => {
+        let message: Message.Task.TaskStatus = { id: props.id, step: 'finish' }
+        window.taskAPI.setTaskProcess(JSON.stringify(message))
         loadData()
     })
 

@@ -1,5 +1,5 @@
-<script setup lang="ts" name="Site">
-    import { defineProps, onMounted, ref } from "vue"
+<script setup lang="ts" name="ForumPublish">
+    import { onMounted, ref } from "vue"
     import { useRouter } from 'vue-router'
     import { Upload, Search } from '@element-plus/icons-vue'
 
@@ -11,7 +11,7 @@
     const clientHeight = ref(0)
     function setHeight() {
         clientHeight.value =  document.documentElement.clientHeight;
-        slbHeight.value = clientHeight.value - 117 + 'px';
+        slbHeight.value = clientHeight.value - 137 + 'px';
     }
     function setscrollbar() {
         setHeight()
@@ -26,14 +26,14 @@
         raw: string
     }
     const isRS = ref<boolean>(false)
-    const rstitle = ref<string>('')
+    const rsTitle = ref<string>('')
     const rsID = ref<number>(0)
     const tableData = ref<Tabledata[]>([])
     const publishInfo = ref<string[]>([])
     const BTLinks = ref<string[]>([])
     const content = ref<string>('')
     const title = ref<string>('')
-    const imgsrc = ref<string>('')
+    const imagePath = ref<string>('')
     const category = ref<number[]>([2, 21])
     const credit_name = ref<string>('')
     const credit_link = ref<string>('')
@@ -95,13 +95,15 @@
     }
     //复制BT链接
     function copyLinks() {
-        window.api.WriteClipboard(generateLinks())
+        let msg: Message.Global.Clipboard = { str: generateLinks() }
+        window.globalAPI.writeClipboard(JSON.stringify(msg))
     }
 
     //RS搜索文章
     async function searchPosts() {
-        const result = await window.api.SearchPosts(rstitle.value)
-        tableData.value = result
+        let msg: Message.Forum.Title = { title: rsTitle.value}
+        const result: Message.Forum.Posts = JSON.parse(await window.forumAPI.searchPosts(JSON.stringify(msg)))
+        tableData.value = result.posts
     }
 
     //RS选择文章
@@ -154,24 +156,27 @@
     const isLoading = ref(false)
     async function readFileContent() {
         isLoading.value = true
-        const result = await window.api.ReadFileContent()
+        const result = await window.globalAPI.readFileContent()
         content.value = result
         isLoading.value = false
     }
-    async function loadFile(type: string) {
+    //选择发布图
+    async function loadImage() {
         isLoading.value = true
-        imgsrc.value = await window.api.OpenFile(type)
+        let msg: Message.Global.FileType = { type: 'webp' }
+        let { path }: Message.Global.Path = JSON.parse(await window.globalAPI.getFilePath(JSON.stringify(msg)))
+        imagePath.value = path
         isLoading.value = false
     }
 
     //路由跳转
-    function toPublish() {
+    function back() {
         router.push({
-            name: 'publish',
+            name: 'bt_publish',
             params: {id: props.id}
         })
     }
-    function toFinish() {
+    function next() {
         router.push({
             name: 'finish',
             params: {id: props.id}
@@ -183,10 +188,27 @@
     async function submit() {
         let result: string
         isPublishing.value = true
-        if (isRS.value)
-            result = await window.api.SiteRSPublish(props.id, rsID.value, title.value, content.value)
-        else
-            result = await window.api.SitePublish(props.id ,JSON.stringify(category.value), imgsrc.value, title.value, content.value)
+        if (isRS.value) {
+            let msg: Message.Forum.RSConfig = {
+                id: props.id,
+                rsID: rsID.value,
+                title: title.value,
+                content: content.value
+            }
+            let message: Message.Task.Result = JSON.parse(await window.forumAPI.rsPublish(JSON.stringify(msg)))
+            result = message.result
+        }
+        else {
+            let msg: Message.Forum.PublishConfig = {
+                id: props.id,
+                categories: JSON.stringify(category.value),
+                imagePath: imagePath.value,
+                title: title.value,
+                content: content.value
+            }
+            let message: Message.Task.Result = JSON.parse(await window.forumAPI.publish(JSON.stringify(msg)))
+            result = message.result
+        }
         if (result == 'empty')
             ElMessage.error('标题或内容为空')
         else if (result == 'unauthorized') 
@@ -213,24 +235,25 @@
 
     //加载信息
     async function loadData() {
-        const result = await window.api.GetSiteInfo(props.id)
-        if (result[6] != '') title.value = result[0]
-        if (result[7] != '') content.value = result[1]
-        if (result[8] != '') imgsrc.value = result[2]
+        let msg: Message.Task.TaskID = { id: props.id }
+        const result: Message.Forum.Contents = JSON.parse(await window.taskAPI.getForumConfig(JSON.stringify(msg)))
+        if (result.title) title.value = result.title
+        if (result.content) content.value = result.content
+        if (result.imagePath) imagePath.value = result.imagePath
     }
     const loadingBT = ref(true)
     async function loadBT() {
         loadingBT.value = true
-        const result = await window.api.GetBTLinks(props.id)
-        BTLinks.value = result.slice(0, 6)
+        let msg: Message.Task.TaskID = { id: props.id }
+        const result: Message.Task.PublishStatus = JSON.parse(await window.BTAPI.getBTLinks(JSON.stringify(msg)))
         publishInfo.value = []
-        publishInfo.value.push('萌番组：' + result[0])
-        publishInfo.value.push('Nyaa：' + result[1])
-        publishInfo.value.push('Acgrip：' + result[2])
-        publishInfo.value.push('动漫花园：' + result[3])
-        publishInfo.value.push('Acgnx：' + result[4])
-        publishInfo.value.push('末日动漫：' + result[5])
-        if (result[6] == 'true')
+        publishInfo.value.push('萌番组：' + result.bangumi)
+        publishInfo.value.push('Nyaa：' + result.nyaa)
+        publishInfo.value.push('Acgrip：' + result.acgrip)
+        publishInfo.value.push('动漫花园：' + result.dmhy)
+        publishInfo.value.push('Acgnx：' + result.acgnx_g)
+        publishInfo.value.push('末日动漫：' + result.acgnx_a)
+        if (result.bangumi_all == 'true')
             content.value = content.value.replace('链接加载中', generateLinks())
         loadingBT.value = false
         ElMessage('加载完成')
@@ -238,13 +261,16 @@
 
     //右键复制事件
     function handleRightClick(str: string) {
-        window.api.WriteClipboard(str)
+        let msg: Message.Global.Clipboard = { str }
+        window.globalAPI.writeClipboard(JSON.stringify(msg))
         ElMessage('复制成功')
     }
 
     onMounted(async () => {
         setscrollbar()
         await loadData()
+        let message: Message.Task.TaskStatus = { id: props.id, step: 'forum_publish' }
+        window.taskAPI.setTaskProcess(JSON.stringify(message))
         loadBT()
     })
 
@@ -257,10 +283,10 @@
                 <el-col :span="3" />
                 <el-col :span="18">
                     <span style="float: left">
-                        <el-link :underline="false" @click="toPublish" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
+                        <el-link :underline="false" @click="back" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
                     </span>
                     <span style="float: right">
-                        <el-link :underline="false" @click="toFinish" type="primary">跳过<el-icon><ArrowRight /></el-icon></el-link>
+                        <el-link :underline="false" @click="next" type="primary">跳过<el-icon><ArrowRight /></el-icon></el-link>
                     </span>
                 </el-col>
                 <el-col :span="3" />
@@ -286,7 +312,7 @@
                                 <el-checkbox v-model="isRS" label="RS覆盖原帖" />
                             </el-form-item>
                             <el-form-item v-show="isRS" label="选择RS文章">
-                                <el-input placeholder="输入标题以进行搜索" v-model="rstitle">
+                                <el-input placeholder="输入标题以进行搜索" v-model="rsTitle">
                                     <template #append>
                                         <el-button :icon="Search" @click="searchPosts()" />
                                     </template>
@@ -315,9 +341,9 @@
                                 </el-table>
                             </el-form-item>
                             <el-form-item v-if="!isRS" label="主站发布图">
-                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imgsrc">
+                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imagePath">
                                     <template #append>
-                                        <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
+                                        <el-button @click="loadImage" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
                                         </el-button>
                                     </template>
@@ -410,10 +436,10 @@
             <el-row style="height: 20px;" />
             <el-row class="title">
                 <el-col>
-                    <el-button class="btn" @click="toPublish()">
+                    <el-button class="btn" @click="back">
                         上一步
                     </el-button>
-                    <el-button class="btn" @click="toFinish()" type="primary" plain>
+                    <el-button class="btn" @click="next" type="primary" plain>
                         跳过
                     </el-button>  
                     <el-button class="btn" :loading="isPublishing" @click="submit()" type="primary">

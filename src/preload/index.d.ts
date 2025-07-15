@@ -1,62 +1,68 @@
-import type { 
-  PublishConfig, 
-  Content_file, 
-  Message_FileContent, 
-  Message_LoginInfo, 
-  Message_ProxyConfig, 
-  Message_TaskInfo,
-  Message_rsPosts,
-  } from '../renderer/src/index.d.ts'
-
 export interface IElectronAPI {
-  WinHandle: (command: string) => void,
-  GetProxyConfig: () => Promise<string>,
-  SetProxyConfig: (config: string) => void,
-  OpenFile: (type: string) => Promise<string>,
-  OpenDirectory: (path: string) => Promise<string>,
-  CreateWithFile: (id: number, config: string) => Promise<string>,
-  CreateWithText: (id: number, config: string) => Promise<string>,
-  SaveContent: (id: number, config: string) => Promise<string>,
-  CreateTask: (path: string, config: PublishConfig) => Promise<string>,
-  OpenTask: (id: number) => Promise<{
-    config: PublishConfig | undefined,
-    status: string
-  }>
-  CheckTask: (id: number) => Promise<Message_FileContent>
-  SaveFileContent: (id: number, type: string, content: string, title: string) => Promise<boolean>
-  GetBangumiTags: (query: string) => Promise
-  SearchBangumiTags: (query: string) => Promise
-  GetLoginInfo: () => Promise<string>
-  OpenLoginWindow: (type: string) => void
-  RefreshLoginData: (loadData: Function) => void
-  RefreshTaskData: (loadData: Function) => void
-  SaveAccountInfo: (info: string) => void
-  CheckLoginStatus: (type: string, value?: string) => void
-  RemoveTask: (index: number) => void
-  GetAllTask: () => Promise<Message_TaskInfo[]>
-  GetPublishInfo: (id: number) => Promise<string>
-  GetSiteInfo: (id: number) => Promise<string[]>
-  GetBTLinks: (id: number) => Promise<string[]>
-  CheckAccount: (type: string) => Promise<string>
-  ReadFileContent: () => Promise<string>
-  SetSiteUAP: (op: boolean, username: string, password: string) => Promise<string[]>
-  Publish: (id: number, type: string) => Promise<string>
-  SitePublish: (id: number, categories: string, imgsrc: string, title: string, content: string) => Promise<string>
-  SiteRSPublish: (id: number, rsID: number, title: string, content: string) => Promise<string>
-  GetSiteSrc: (id: number) => Promise<string>
-  ClearStorage: () => void
-  WriteClipboard: (str: string) => void
-  SearchPosts: (str: string) => Promise<Message_rsPosts[]>
-  LoadFromTxt: () => Promise<string[]>
-  ExportCookies: (type: number) => void
-  ImportCookies: (type: number) => void
-  GetImageCaptcha: (loadImage: Function) => void
-  GetReCaptcha: (loadImage: Function) => void
-  ExportContent: (id: number, type: string) => void
+}
+
+export interface GlobalAPI {
+  winHandle: (msg: string) => void
+  getProxyConfig: () => Promise<string>
+  setProxyConfig: (config: string) => void
+  getFilePath: (msg: string) => Promise<string>
+  getFolderPath: () => Promise<string>
+  openFolder: (msg: string) => void
+  writeClipboard: (msg: string) => void
+  readFileContent: () => Promise<string>
+}
+
+export interface BTAPI {
+  loadReCaptcha: (loadReCaptcha: Function) => void
+  loadImageCaptcha: (loadImage: Function) => void
+  loginAccount: (msg: string) => void
+  checkLoginStatus: (msg: string) => Promise<string>
+  openLoginWindow: (msg: string) => void
+  refreshLoginData: (loadData: Function) => void
+  saveAccountInfo: (msg: string) => void
+  getAccountInfo: (msg: string) => Promise<string>
+  importCookies: (msg: string) => void
+  exportCookies: (msg: string) => void
+  clearStorage: () => void
+  publish: (msg: string) => Promise<string>
+  getBangumiTags: (msg: string) => Promise<string>
+  searchBangumiTags: (msg: string) => Promise<string>
+  getBTLinks: (msg: string) => Promise<string>
+}
+
+export interface ForumAPI {
+  saveAccountInfo: (msg: string) => void
+  getAccountInfo: () => Promise<string>
+  searchPosts: (msg: string) => Promise<string>
+  publish: (msg: string) => Promise<string>
+  rsPublish: (msg: string) => Promise<string>
+}
+
+export interface TaskAPI {
+  refreshTaskData: (loadData: Function) => void
+  createTask: (msg: string) => Promise<string>
+  getTaskList: () => Promise<string>
+  removeTask: (msg: string) => void
+  getTaskType: (msg: string) => Promise<string>
+  setTaskProcess: (msg: string) => void
+  getForumLink: (msg: string) => Promise<string>
+  getContent: (msg: string) => Promise<string>
+  saveContent: (msg: string) => void
+  exportContent: (msg: string) => void
+  saveTitle: (msg: string) => void
+  getPublishStatus: (msg: string) => Promise<string>
+  getPublishConfig: (msg: string) => Promise<string>
+  loadComparisons: () => Promise<string>
+  saveConfig: (msg: string) => Promise<string>
+  createConfig: (msg: string) => Promise<string>
+  getForumConfig: (msg: string) => Promise<string>
 }
 
 declare global {
   interface Window {
-    api: IElectronAPI
+    globalAPI: GlobalAPI
+    BTAPI: BTAPI
+    forumAPI: ForumAPI
+    taskAPI: TaskAPI
   }
 }
