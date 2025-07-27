@@ -1,4 +1,4 @@
-<script lang="ts" name="Localtask" setup>
+<script lang="ts" setup name="TaskList">
     import { ref, reactive, onMounted, computed } from "vue";
     import { useRouter } from 'vue-router'
 
@@ -7,7 +7,7 @@
     const clientHeight = ref(0)
     function setHeight() {
         clientHeight.value =  document.documentElement.clientHeight;
-        slbHeight.value = clientHeight.value - 50 + 'px';
+        slbHeight.value = clientHeight.value - 60 + 'px';
     }
     function setscrollbar() {
         setHeight()
@@ -39,7 +39,7 @@
 
     //跳转发布页面
     const router = useRouter()
-    function toPublish(id: number) {
+    function openTask(id: number) {
         router.push({
             name: data.find((item) => item.id == id)!.step,
             params: {id: id}
@@ -47,20 +47,21 @@
     }
 
     //打开项目目录
-    async function OpenDirectory(path: string){
-        window.api.OpenDirectory(path)
+    async function openFolder(path: string){
+        let msg: Message.Global.Path = { path }
+        window.globalAPI.openFolder(JSON.stringify(msg))
     }
 
     //加载数据
     async function loadData() {
         data.length = 0
-        const taskInfo = await window.api.GetAllTask()
-        taskInfo.forEach((value) => {
+        const { list }: Message.Task.TaskList = JSON.parse(await window.taskAPI.getTaskList())
+        list.forEach((value) => {
             let str: string
-            if (value.step == 'create') str = '编辑配置阶段'
+            if (value.step == 'edit') str = '编辑配置阶段'
             else if (value.step == 'check') str = '复核阶段'
-            else if (value.step == 'publish') str = 'BT发布阶段'
-            else if (value.step == 'site') str = '主站发布阶段'
+            else if (value.step == 'bt_publish') str = 'BT发布阶段'
+            else if (value.step == 'forum_publish') str = '主站发布阶段'
             else str = '发布完成'
             if (value.status == 'published') str = '发布完成'
             data.push({
@@ -79,16 +80,18 @@
             })
         })
     }
-    window.api.RefreshTaskData(loadData)
+    window.taskAPI.refreshTaskData(loadData)
 
     //删除任务
     function remove(id: number) {
-        window.api.RemoveTask(id)
+        let msg: Message.Task.TaskID = { id }
+        window.taskAPI.removeTask(JSON.stringify(msg))
     }
 
     //右键复制事件
     function handleRightClick(str: string) {
-        window.api.WriteClipboard(str)
+        let msg: Message.Global.Clipboard = { str }
+        window.globalAPI.writeClipboard(JSON.stringify(msg))
         ElMessage('复制成功')
     }
 
@@ -118,7 +121,7 @@
                         <el-table-column fixed="right" label="发布" width="80">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" 
-                                @click="toPublish(scope.row.id)">
+                                @click="openTask(scope.row.id)">
                                     继续发布
                                 </el-button>
                             </template>
@@ -126,7 +129,7 @@
                         <el-table-column fixed="right" label="打开" width="80">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" 
-                                @click="OpenDirectory(scope.row.path)">
+                                @click="openFolder(scope.row.path)">
                                     打开目录
                                 </el-button>
                             </template>

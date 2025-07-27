@@ -1,7 +1,7 @@
-<script setup lang="ts" name="Site">
-    import { defineProps, onMounted, ref } from "vue"
+<script setup lang="ts" name="ForumPublish">
+    import { onMounted, ref } from "vue"
     import { useRouter } from 'vue-router'
-    import { Upload, Search } from '@element-plus/icons-vue'
+    import { Upload, Search, View, Edit } from '@element-plus/icons-vue'
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
@@ -11,7 +11,7 @@
     const clientHeight = ref(0)
     function setHeight() {
         clientHeight.value =  document.documentElement.clientHeight;
-        slbHeight.value = clientHeight.value - 117 + 'px';
+        slbHeight.value = clientHeight.value - 137 + 'px';
     }
     function setscrollbar() {
         setHeight()
@@ -26,14 +26,13 @@
         raw: string
     }
     const isRS = ref<boolean>(false)
-    const rstitle = ref<string>('')
+    const rsTitle = ref<string>('')
     const rsID = ref<number>(0)
     const tableData = ref<Tabledata[]>([])
     const publishInfo = ref<string[]>([])
-    const BTLinks = ref<string[]>([])
     const content = ref<string>('')
     const title = ref<string>('')
-    const imgsrc = ref<string>('')
+    const imagePath = ref<string>('')
     const category = ref<number[]>([2, 21])
     const credit_name = ref<string>('')
     const credit_link = ref<string>('')
@@ -68,40 +67,64 @@
         if (credit_link.value == '') return
         let credit = `Image Credit: <a href="${credit_link.value}" rel="noopener" target="_blank">${credit_name.value}</a>\n\n<label`
         content.value = content.value.replace('<label', credit)
+        ElMessage({
+            message: '添加Credit成功',
+            type: 'success'
+        })
     }
     //添加MediaInfo
     function addMediaInfo() {
         if (mediaInfo.value == '') return
+        if (!content.value.includes('请将MediaInfo放置于此')) return
         content.value = content.value.replace('请将MediaInfo放置于此', mediaInfo.value)
+        ElMessage({
+            message: '添加MediaInfo成功',
+            type: 'success'
+        })
     }
     //添加旧链
     function addLinks() {
         if (oldLinks.value == '') return
+        if (!content.value.includes('请将旧链放于此')) return
         content.value = content.value.replace('请将旧链放于此', oldLinks.value)
+        ElMessage({
+            message: '添加旧链成功',
+            type: 'success'
+        })
     }
     //添加过往修正
     function addComments() {
         if (oldComment.value == '') return
-        content.value = content.value.replace(/(\[box\sstyle="info"\][\s\S]*?重发修正[\s\S]*?\[\/box\])/, '$1\n\n' + oldComment.value)
+        let newContent = content.value.replace(/(\[box\sstyle="info"\][\s\S]*?重发修正[\s\S]*?\[\/box\])/, '$1\n\n' + oldComment.value)
+        if (content.value === newContent) return
+        content.value = newContent
+        ElMessage({
+            message: '添加过往修正成功',
+            type: 'success'
+        })
     }
 
     //整理BT链接
     function generateLinks() {
         let content: string = ''
-        for (let i = 0; i < 6; i++)
-            if (BTLinks.value[i] != '' && BTLinks.value[i] != '未找到链接')
-                content += `<a href="${BTLinks.value[i]}">${BTLinks.value[i]}</a>\n\n`
+        for (let i = 0; i < 6; i++) {
+            let link = publishInfo.value[i].split('：')[1]
+            if (link != '未找到链接')
+                content += `<a href="${link}">${link}</a>\n\n`
+        }
         return content
     }
     //复制BT链接
     function copyLinks() {
-        window.api.WriteClipboard(generateLinks())
+        let msg: Message.Global.Clipboard = { str: generateLinks() }
+        window.globalAPI.writeClipboard(JSON.stringify(msg))
     }
 
     //RS搜索文章
     async function searchPosts() {
-        const result = await window.api.SearchPosts(rstitle.value)
-        tableData.value = result
+        let msg: Message.Forum.Title = { title: rsTitle.value}
+        const result: Message.Forum.Posts = JSON.parse(await window.forumAPI.searchPosts(JSON.stringify(msg)))
+        tableData.value = result.posts
     }
 
     //RS选择文章
@@ -154,39 +177,65 @@
     const isLoading = ref(false)
     async function readFileContent() {
         isLoading.value = true
-        const result = await window.api.ReadFileContent()
-        content.value = result
+        const result: Message.Global.FileContent = JSON.parse(await window.globalAPI.readFileContent())
+        content.value = result.content
         isLoading.value = false
     }
-    async function loadFile(type: string) {
+    //选择发布图
+    async function loadImage() {
         isLoading.value = true
-        imgsrc.value = await window.api.OpenFile(type)
+        let msg: Message.Global.FileType = { type: 'webp' }
+        let { path }: Message.Global.Path = JSON.parse(await window.globalAPI.getFilePath(JSON.stringify(msg)))
+        imagePath.value = path
         isLoading.value = false
     }
 
     //路由跳转
-    function toPublish() {
+    function back() {
         router.push({
-            name: 'publish',
+            name: 'bt_publish',
             params: {id: props.id}
         })
     }
-    function toFinish() {
+    function next() {
         router.push({
             name: 'finish',
             params: {id: props.id}
         })
     }
 
+    //控制对话框显示
+    const editContent = ref(false)
+    const editMediaInfo = ref(false)
+    const editOldLinks = ref(false)
+    const editComments = ref(false)
+
     //提交发布内容
     const isPublishing = ref(false)
     async function submit() {
         let result: string
         isPublishing.value = true
-        if (isRS.value)
-            result = await window.api.SiteRSPublish(props.id, rsID.value, title.value, content.value)
-        else
-            result = await window.api.SitePublish(props.id ,JSON.stringify(category.value), imgsrc.value, title.value, content.value)
+        if (isRS.value) {
+            let msg: Message.Forum.RSConfig = {
+                id: props.id,
+                rsID: rsID.value,
+                title: title.value,
+                content: content.value
+            }
+            let message: Message.Task.Result = JSON.parse(await window.forumAPI.rsPublish(JSON.stringify(msg)))
+            result = message.result
+        }
+        else {
+            let msg: Message.Forum.PublishConfig = {
+                id: props.id,
+                categories: JSON.stringify(category.value),
+                imagePath: imagePath.value,
+                title: title.value,
+                content: content.value
+            }
+            let message: Message.Task.Result = JSON.parse(await window.forumAPI.publish(JSON.stringify(msg)))
+            result = message.result
+        }
         if (result == 'empty')
             ElMessage.error('标题或内容为空')
         else if (result == 'unauthorized') 
@@ -213,38 +262,48 @@
 
     //加载信息
     async function loadData() {
-        const result = await window.api.GetSiteInfo(props.id)
-        if (result[6] != '') title.value = result[0]
-        if (result[7] != '') content.value = result[1]
-        if (result[8] != '') imgsrc.value = result[2]
+        let msg: Message.Task.TaskID = { id: props.id }
+        const result: Message.Forum.Contents = JSON.parse(await window.taskAPI.getForumConfig(JSON.stringify(msg)))
+        if (result.title) title.value = result.title
+        if (result.content) content.value = result.content
+        if (result.imagePath) imagePath.value = result.imagePath
     }
     const loadingBT = ref(true)
     async function loadBT() {
         loadingBT.value = true
-        const result = await window.api.GetBTLinks(props.id)
-        BTLinks.value = result.slice(0, 6)
+        let msg: Message.Task.TaskID = { id: props.id }
+        const result: Message.Task.PublishStatus = JSON.parse(await window.BTAPI.getBTLinks(JSON.stringify(msg)))
         publishInfo.value = []
-        publishInfo.value.push('萌番组：' + result[0])
-        publishInfo.value.push('Nyaa：' + result[1])
-        publishInfo.value.push('Acgrip：' + result[2])
-        publishInfo.value.push('动漫花园：' + result[3])
-        publishInfo.value.push('Acgnx：' + result[4])
-        publishInfo.value.push('末日动漫：' + result[5])
-        if (result[6] == 'true')
-            content.value = content.value.replace('链接加载中', generateLinks())
+        publishInfo.value.push('萌番组：' + result.bangumi)
+        publishInfo.value.push('Nyaa：' + result.nyaa)
+        publishInfo.value.push('Acgrip：' + result.acgrip)
+        publishInfo.value.push('动漫花园：' + result.dmhy)
+        publishInfo.value.push('Acgnx：' + result.acgnx_g)
+        publishInfo.value.push('末日动漫：' + result.acgnx_a)
         loadingBT.value = false
-        ElMessage('加载完成')
+        if (result.bangumi_all == 'true') {
+            content.value = content.value.replace('链接加载中', generateLinks())
+            ElMessage({
+                message: 'BT链接加载完成',
+                type: 'success'
+            })
+        }
+        else
+            ElMessage('缺少部分链接')
     }
 
     //右键复制事件
     function handleRightClick(str: string) {
-        window.api.WriteClipboard(str)
+        let msg: Message.Global.Clipboard = { str }
+        window.globalAPI.writeClipboard(JSON.stringify(msg))
         ElMessage('复制成功')
     }
 
     onMounted(async () => {
         setscrollbar()
         await loadData()
+        let message: Message.Task.TaskStatus = { id: props.id, step: 'forum_publish' }
+        window.taskAPI.setTaskProcess(JSON.stringify(message))
         loadBT()
     })
 
@@ -257,10 +316,10 @@
                 <el-col :span="3" />
                 <el-col :span="18">
                     <span style="float: left">
-                        <el-link :underline="false" @click="toPublish" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
+                        <el-link :underline="false" @click="back" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
                     </span>
                     <span style="float: right">
-                        <el-link :underline="false" @click="toFinish" type="primary">跳过<el-icon><ArrowRight /></el-icon></el-link>
+                        <el-link :underline="false" @click="next" type="primary">跳过<el-icon><ArrowRight /></el-icon></el-link>
                     </span>
                 </el-col>
                 <el-col :span="3" />
@@ -286,7 +345,7 @@
                                 <el-checkbox v-model="isRS" label="RS覆盖原帖" />
                             </el-form-item>
                             <el-form-item v-show="isRS" label="选择RS文章">
-                                <el-input placeholder="输入标题以进行搜索" v-model="rstitle">
+                                <el-input placeholder="输入标题以进行搜索" v-model="rsTitle">
                                     <template #append>
                                         <el-button :icon="Search" @click="searchPosts()" />
                                     </template>
@@ -315,9 +374,9 @@
                                 </el-table>
                             </el-form-item>
                             <el-form-item v-if="!isRS" label="主站发布图">
-                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imgsrc">
+                                <el-input placeholder="选择一张图片，RS项目可留空" v-model="imagePath">
                                     <template #append>
-                                        <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
+                                        <el-button @click="loadImage" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
                                         </el-button>
                                     </template>
@@ -326,6 +385,21 @@
                             <el-form-item v-if="!isRS" label="分类">
                                 <el-select-v2 v-model="category" :options="options"
                                     multiple placeholder="选择类别" style="width: 250px" />
+                            </el-form-item>
+                            <el-form-item label="主站发布稿">
+                                <span><el-button @click="editContent = true" type="primary" link :icon="View">查看发布稿</el-button></span>
+                                <span style="margin-left: 10px;">
+                                    <el-button :icon="Upload" type="primary" @click="readFileContent()" link
+                                    v-loading.fullscreen.lock="isLoading">
+                                        选择一个文件
+                                    </el-button>
+                                </span>
+                                <el-dialog v-model="editContent" width="900" title="查看和编辑发布稿">
+                                    <div v-loading="isPublishing">
+                                        <el-input v-model="content" :autosize="{minRows:20}" type="textarea" placeholder="主站发布稿" />
+                                        <div class="title"><el-button size="large" style="margin-top: 20px;" type="primary" @click="submit">确认并继续发布</el-button></div>
+                                    </div>
+                                </el-dialog>
                             </el-form-item>
                         </el-form>
                     </div>
@@ -338,85 +412,58 @@
                             </div>
                         </el-collapse-item>
                         <el-collapse-item title="填写模板">
-                            <h3>Credit信息：</h3>
-                            <div>
-                                <span>
-                                    <span>署名：</span>
-                                    <span>
-                                        <el-input style="width: 120px;" v-model="credit_name" />
-                                    </span>
-                                </span>
-                                <span>
-                                    <span style="margin-left: 20px;">链接：</span>
-                                    <span>
-                                        <el-input style="width: 320px;" v-model="credit_link" />
-                                    </span>
-                                </span>
-                                <span>
-                                    <el-button style="margin-left: 20px;" @click="addCredit()">添加Credit信息</el-button>
-                                </span>
-                            </div>
-                            <h3>MediaInfo:</h3>
-                            <div>
-                                <el-input
-                                    v-model="mediaInfo"
-                                    :autosize="{minRows:20}"
-                                    type="textarea"
-                                    placeholder="请填写MediaInfo"
-                                />
-                                <el-button style="margin-top: 20px;" @click="addMediaInfo()">添加MediaInfo</el-button>
-                            </div>
-                            <h3 v-if="isRS">RS旧链：</h3>
-                            <div v-if="isRS">
-                                <el-input
-                                    v-model="oldLinks"
-                                    :autosize="{minRows:10}"
-                                    type="textarea"
-                                    placeholder="请填写旧链"
-                                />
-                                <el-button style="margin-top: 20px;" @click="addLinks()">添加旧链</el-button>
-                            </div>
-                            <h3 v-if="isRS">过往修正：</h3>
-                            <div v-if="isRS">
-                                <el-input
-                                    v-model="oldComment"
-                                    :autosize="{minRows:10}"
-                                    type="textarea"
-                                    placeholder="填写过往修正"
-                                />
-                                <el-button style="margin-top: 20px;" @click="addComments()">添加过往修正</el-button>
-                            </div>
+                            <el-row>
+                                <h3>Credit信息：</h3>
+                                <el-button link style="margin-left: 10px;" @click="addCredit()" :icon="Edit" >添加Credit信息</el-button>
+                            </el-row>
+                            <el-row>
+                                <span>署名：</span>
+                                <el-input style="width: 150px;" v-model="credit_name" />
+                                <span style="margin-left: 20px;">链接：</span>
+                                <el-input style="width: 420px;" v-model="credit_link" />
+                            </el-row>
+                            <el-row style="margin-top: 20px;">
+                                <h3>MediaInfo:</h3>
+                                <el-button style="margin-left: 10px;" @click="editMediaInfo = true" 
+                                type="primary" link :icon="View">查看MediaInfo</el-button>
+                                <el-button link @click="addMediaInfo()" :icon="Edit" >添加MediaInfo</el-button>
+                            </el-row>
+                            <el-dialog v-model="editMediaInfo" width="900" title="查看和编辑MediaInfo">
+                                <el-input v-model="mediaInfo" :autosize="{minRows:20}" type="textarea" placeholder="请填写MediaInfo" />
+                            </el-dialog>
+                            <el-row v-if="isRS">
+                                <h3>RS旧链：</h3>
+                                <el-button style="margin-left: 10px;" @click="editOldLinks = true" 
+                                type="primary" link :icon="View">查看Reseed旧链接</el-button>
+                                <el-button link @click="addLinks()" :icon="Edit" >添加旧链</el-button>
+                            </el-row>
+                            <el-dialog v-model="editOldLinks" width="900" title="查看和编辑Reseed旧链接">
+                                <el-input v-model="oldLinks" :autosize="{minRows:10}" type="textarea" placeholder="请填写旧链" />
+                            </el-dialog>
+                            <el-row v-if="isRS">
+                                <h3 >过往修正：</h3>
+                                <el-button style="margin-left: 10px;" @click="editComments = true" 
+                                type="primary" link :icon="View">查看过往修正</el-button>
+                                <el-button link @click="addComments()" :icon="Edit" >添加过往修正</el-button>
+                            </el-row>
+                            <el-dialog v-model="editComments" width="900" title="查看和编辑过往修正">
+                                <el-input v-model="oldComment" :autosize="{minRows:10}" type="textarea" placeholder="填写过往修正" />
+                            </el-dialog>
                         </el-collapse-item>
                     </el-collapse>
-                    <el-row style="height: 20px;" />
-                    <span style="font-size: large; font-weight: bold;">主站发布稿</span>
-                    <span style="float: right;text-align: right;">
-                        <el-button :icon="Upload" 
-                        @click="readFileContent()"
-                        v-loading.fullscreen.lock="isLoading">
-                            选择一个文件
-                        </el-button>
-                    </span>
-                    <el-row style="height: 20px;" />
-                    <el-input
-                        v-model="content"
-                        :autosize="{minRows:20}"
-                        type="textarea"
-                        placeholder="主站发布稿"
-                    />
                 </el-col>
                 <el-col :span="3" />
             </el-row>
             <el-row style="height: 20px;" />
             <el-row class="title">
                 <el-col>
-                    <el-button class="btn" @click="toPublish()">
+                    <el-button class="btn" @click="back">
                         上一步
                     </el-button>
-                    <el-button class="btn" @click="toFinish()" type="primary" plain>
+                    <el-button class="btn" @click="next" type="primary" plain>
                         跳过
                     </el-button>  
-                    <el-button class="btn" :loading="isPublishing" @click="submit()" type="primary">
+                    <el-button class="btn" @click="editContent = true" type="primary">
                         发布
                     </el-button>  
                 </el-col>  

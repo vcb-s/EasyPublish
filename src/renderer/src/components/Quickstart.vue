@@ -10,7 +10,7 @@ const isDark = useDark()
         <img v-else src="../assets/logo.png" />
     </div>
     <br />
-    当前版本：1.2.1<br />
+    当前版本：1.3.0<br />
     项目地址：<a href="https://github.com/vcb-s/EasyPublish/tree/main">https://github.com/vcb-s/EasyPublish/tree/main</a><br />
     这个快速开始让我吃了，去项目页看吧。
 </div>

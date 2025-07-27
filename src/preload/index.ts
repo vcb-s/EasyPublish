@@ -1,53 +1,72 @@
 import { contextBridge } from 'electron'
 import { ipcRenderer } from 'electron/renderer'
-import type { PublishConfig} from '../renderer/src/index.d.ts'
 
-// Custom APIs for renderer
-const api = {
-  WinHandle: (command: string) => ipcRenderer.send("WinHandle", command) , 
-  OpenFile: async (type: string) => await ipcRenderer.invoke('openFile', type) , 
-  OpenDirectory: async (path: string) => await ipcRenderer.invoke('openDirectory', path) , 
-  GetProxyConfig: async () => await ipcRenderer.invoke('getProxyConfig'), 
-  SetProxyConfig: (config: string) => ipcRenderer.send('setProxyConfig', config), 
-  CreateTask: async (path: string, config: PublishConfig) => await ipcRenderer.invoke('createTask', path, config) ,
-  CreateWithFile: async (id: number, config: string) => await ipcRenderer.invoke('createWithFile', id, config), 
-  CreateWithText: async (id: number, config: string) => await ipcRenderer.invoke('createWithText', id, config), 
-  SaveContent: async (id: number, config: string) => await ipcRenderer.invoke('saveContent', id, config), 
-  OpenTask: async (id: number) => await ipcRenderer.invoke('openTask', id),
-  CheckTask: async (id: number) => await ipcRenderer.invoke('checkTask', id),
-  SaveFileContent: async (id: number, type: string, content: string, title: string) => await ipcRenderer.invoke('saveFileContent', id, type, content, title), 
-  GetBangumiTags: async (query: string) => await ipcRenderer.invoke('getBangumiTag', query),
-  SearchBangumiTags: async (query: string) => await ipcRenderer.invoke('searchBangumiTag', query),
-  GetLoginInfo: async () => await ipcRenderer.invoke('getLoginInfo'),
-  OpenLoginWindow: (type: string) => ipcRenderer.send('openLoginWindow', type),
-  RefreshLoginData: (loadData: () => void) => ipcRenderer.on('refreshLoginData', _event => loadData()),
-  RefreshTaskData: (loadData: () => void) => ipcRenderer.on('refreshTaskData', _event => loadData()),
-  SaveAccountInfo: (info: string) => ipcRenderer.send('saveAccountInfo', info),
-  CheckLoginStatus: (type: string, value?: string) => ipcRenderer.send('checkLoginStatus', type, value),
-  RemoveTask: (index: number) => ipcRenderer.send('removeTask', index),
-  GetAllTask: async () => await ipcRenderer.invoke('getAllTask'),
-  GetPublishInfo: async (id: number) => await ipcRenderer.invoke('getPublishInfo', id),
-  GetSiteInfo: async (id: number) => await ipcRenderer.invoke('getSiteInfo', id),
-  GetBTLinks: async (id: number) => await ipcRenderer.invoke('getBTLinks', id), 
-  CheckAccount: async (type: string) => await ipcRenderer.invoke('checkAcount', type),
-  ReadFileContent: async () => await ipcRenderer.invoke('readFileContent'),
-  SetSiteUAP: async (op: boolean, username: string, password: string) => await ipcRenderer.invoke('setSiteUAP', op, username, password),
-  Publish: async (id: number, type: string) => await ipcRenderer.invoke('publish', id, type),
-  SitePublish: async (id: number, categories: string, imgsrc: string, title: string, content: string) => await ipcRenderer.invoke('sitePublish', id, title, content, imgsrc, categories),
-  SiteRSPublish: async (id: number, rsID: number, title: string, content: string) => await ipcRenderer.invoke('siteRSPublish', id, rsID, title, content),
-  GetSiteSrc: async (id: number) => await ipcRenderer.invoke('getSiteSrc', id),
-  ClearStorage: () => ipcRenderer.send('clearStorage'),
-  WriteClipboard: (str: string) => ipcRenderer.send('writeClipboard', str),
-  SearchPosts: (str: string) => ipcRenderer.invoke("searchPosts", str),
-  LoadFromTxt: () => ipcRenderer.invoke("loadFromTxt"),
-  ExportCookies: (type: number) => ipcRenderer.send('exportCookies', type),
-  ImportCookies: (type: number) => ipcRenderer.send('importCookies', type),
-  GetImageCaptcha: (loadImage: () => void) => ipcRenderer.on('loadIamgeCaptcha', _event => loadImage()),
-  GetReCaptcha: (loadReCaptcha: (type: string) => void) => ipcRenderer.on('loadReCaptcha', (_event, type) => loadReCaptcha(type)),
-  ExportContent: (id: number, type: string) => ipcRenderer.send('exportContent', id, type),
+const globalAPI = {
+  getProxyConfig: async () => await ipcRenderer.invoke('global_getProxyConfig'), 
+  getFilePath: async (msg: string) => await ipcRenderer.invoke('global_getFilePath', msg),
+  getFolderPath: async () => await ipcRenderer.invoke('global_getFolderPath'),
+  readFileContent: async () => await ipcRenderer.invoke('global_readFileContent'),
+  html2markdown: async (msg: string) => await ipcRenderer.invoke('global_html2markdown', msg),
+  html2bbcode: async (msg: string) => await ipcRenderer.invoke('global_html2bbcode', msg),
+  winHandle: (msg: string) => ipcRenderer.send("global_winHandle", msg) , 
+  setProxyConfig: (msg: string) => ipcRenderer.send('global_setProxyConfig', msg), 
+  openFolder: (msg: string) => ipcRenderer.send('global_openFolder', msg), 
+  writeClipboard: (msg: string) => ipcRenderer.send('global_writeClipboard', msg),
+}
+
+const BTAPI = {
+  loadReCaptcha: (loadReCaptcha: (msg: string) => void) => ipcRenderer.on('BT_loadReCaptcha', (_event, msg) => loadReCaptcha(msg)),
+  refreshLoginData: (loadData: () => void) => ipcRenderer.on('BT_refreshLoginData', _event => loadData()),
+  loadImageCaptcha: (loadImage: () => void) => ipcRenderer.on('BT_loadIamgeCaptcha', _event => loadImage()),
+  getAccountInfo: async (msg: string) => await ipcRenderer.invoke('BT_getAccountInfo', msg),
+  checkLoginStatus: async (msg: string) => await ipcRenderer.invoke('BT_checkLoginStatus', msg),
+  getBangumiTags: async (msg: string) => await ipcRenderer.invoke('BT_getBangumiTags', msg),
+  searchBangumiTags: async (msg: string) => await ipcRenderer.invoke('BT_searchBangumiTags', msg),
+  publish: async (msg: string) => await ipcRenderer.invoke('BT_publish', msg),
+  getBTLinks: async (msg: string) => await ipcRenderer.invoke('BT_getBTLinks', msg), 
+  getTorrentDetail: async (msg: string) => await ipcRenderer.invoke('BT_getTorrentDetail', msg), 
+  updateTorrent: async (msg: string) => await ipcRenderer.invoke('BT_updateTorrent', msg),
+  getTorrentList: async () => await ipcRenderer.invoke('BT_getTorrentList'), 
+  loginAccount: (msg: string) => ipcRenderer.send('BT_loginAccount', msg),
+  openLoginWindow: (msg: string) => ipcRenderer.send('BT_openLoginWindow', msg),
+  saveAccountInfo: (msg: string) => ipcRenderer.send('BT_saveAccountInfo', msg),
+  exportCookies: (msg: string) => ipcRenderer.send('BT_exportCookies', msg),
+  importCookies: (msg: string) => ipcRenderer.send('BT_importCookies', msg),
+  clearStorage: () => ipcRenderer.send('BT_clearStorage'),
+}
+
+const forumAPI = {
+  getAccountInfo: async () => await ipcRenderer.invoke('forum_getAccountInfo'),
+  searchPosts: async (msg: string) => await ipcRenderer.invoke("forum_searchPosts", msg),
+  publish: async (msg: string) => await ipcRenderer.invoke('forum_publish', msg),
+  rsPublish: async (msg: string) => await ipcRenderer.invoke('forum_rsPublish', msg),
+  saveAccountInfo: (msg: string) => ipcRenderer.send('forum_saveAccountInfo', msg),
+}
+
+const taskAPI = {
+  refreshTaskData: (loadData: () => void) => ipcRenderer.on('task_refreshTaskData', _event => loadData()),
+  createTask: async (msg: string) => await ipcRenderer.invoke('task_createTask', msg),
+  getTaskList: async () => await ipcRenderer.invoke('task_getTaskList'),
+  getTaskType: async (msg: string) => await ipcRenderer.invoke('task_getTaskType', msg),
+  getForumLink: async (msg: string) => await ipcRenderer.invoke('task_getForumLink', msg),
+  getContent: async (msg: string) => await ipcRenderer.invoke('task_getContent', msg),
+  getPublishConfig: async (msg: string) => await ipcRenderer.invoke('task_getPublishConfig', msg),
+  getPublishStatus: async (msg: string) => await ipcRenderer.invoke('task_getPublishStatus', msg),
+  loadComparisons: () => ipcRenderer.invoke("task_loadComparisons"),
+  saveConfig: async (msg: string) => await ipcRenderer.invoke('task_saveConfig', msg), 
+  createConfig: async (msg: string) => await ipcRenderer.invoke('task_createConfig', msg), 
+  getForumConfig: async (msg: string) => await ipcRenderer.invoke('task_getForumConfig', msg),
+  saveContent: (msg: string) => ipcRenderer.send('task_saveContent', msg),
+  exportContent: (msg: string) => ipcRenderer.send('task_exportContent', msg),
+  saveTitle: (msg: string) => ipcRenderer.send('task_saveTitle', msg),
+  removeTask: (msg: string) => ipcRenderer.send('task_removeTask', msg),
+  setTaskProcess: (msg: string) => ipcRenderer.send('task_setTaskProcess', msg),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
-contextBridge.exposeInMainWorld('api', api)
+contextBridge.exposeInMainWorld('globalAPI', globalAPI)
+contextBridge.exposeInMainWorld('BTAPI', BTAPI)
+contextBridge.exposeInMainWorld('forumAPI', forumAPI)
+contextBridge.exposeInMainWorld('taskAPI', taskAPI)

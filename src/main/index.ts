@@ -1,15 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Cookie, session, clipboard, net } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, session, clipboard, net, Session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import type { PublishConfig, 
-  Content_file, 
-  Content_text,
-  Message_PublishStatus,
-  Message_LoginInfo, 
-  Message_AccountInfo,
-  ProxyConfig, 
-  Message_rsPosts,
-} from '../renderer/src/index.d.ts'
 import fs from 'fs'
 import { JSONFilePreset } from 'lowdb/node'
 import { Low } from 'lowdb'
@@ -27,120 +18,104 @@ import acgnxResponse from '../renderer/src/assets/acgnx.html?asset'
 import nyaaResponse from '../renderer/src/assets/nyaa.html?asset'
 import appIcon from '../../build/icon.ico?asset'
 
-//应用数据管理及异常处理错误日志打印
-app.commandLine.appendSwitch('lang', 'zh-CN');
-const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
-log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]{scope} {text}'
-const date = new Date()
-const dateStr = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
-log.transports.file.resolvePathFn = ()=> app.getPath('userData') + '\\logs\\' + dateStr + '.log'
-log.initialize()
-console.log = log.log
-console.log(app.getPath('userData') + '\\logs\\' + dateStr + '.log')
-process.on('uncaughtException', (err) => {log.error(err)})
+/*
+  应用初始化和全局设置相关
+*/
+//初始化日志
+function initializeLog() {
+  log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]{scope} {text}'
+  const date = new Date()
+  const dateStr = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
+  log.transports.file.resolvePathFn = ()=> app.getPath('userData') + '\\logs\\' + dateStr + '.log'
+  log.initialize()
+  console.log = log.log
+  console.log(app.getPath('userData') + '\\logs\\' + dateStr + '.log') 
+}
+initializeLog()
+//默认语言中文
+app.commandLine.appendSwitch('lang', 'zh-CN')
+//全局捕获未经处理的异常
+process.on('uncaughtException', (err) => {
+  log.error(err)
+  dialog.showErrorBox('错误', (err as Error).message)
+})
 
-type Storage = {
-  id: number
-  name: string
-  path: string
-  bangumi?: string
-  nyaa?: string
-  acgrip?: string
-  dmhy?: string
-  acgnx_g?: string
-  acgnx_a?: string
-  site?: string
-  sync: boolean
-  status: 'published' | 'publishing'
-  step: 'create' | 'check' | 'publish' | 'site' | 'finish'
-}
-type LoginInfo = {
-  name: string, 
-  time: string, 
-  status: string,
-  username: string,
-  password: string,
-  enable: boolean,
-  cookie: Cookie[]
-}
-type Data = {
-  posts: Storage[],
-  cookies: LoginInfo[],
-  proxyConfig: ProxyConfig,
-  site: {username: string, password: string}
-}
-const defaultData: Data = { posts: [],  
+//定义数据库
+let taskDB: Low<Config.TaskData>
+let userDB: Low<Config.UserData>
+
+const defaultTaskData: Config.TaskData = { tasks: [] }
+const defaultUserData: Config.UserData = {  
   proxyConfig: {
     status: false,
     type: '',
     host: '',
     port: 8080,
   },
-  site: {username: '', password: ''},
-  cookies: [
-  {
-    name: 'bangumi',
-    time: '--',
-    status: '账号未登录',
-    username: '',
-    password: '',
-    enable: true,
-    cookie: []
-  },
-  {
-    name: 'nyaa',
-    time: '--',
-    status: '账号未登录',
-    username: '',
-    password: '',
-    enable: true,
-    cookie: []
-  },
-  {
-    name: 'acgrip',
-    time: '--',
-    status: '账号未登录',
-    username: '',
-    password: '',
-    enable: true,
-    cookie: []
-  },
-  {
-    name: 'dmhy',
-    time: '--',
-    status: '账号未登录',
-    username: '',
-    password: '',
-    enable: true,
-    cookie: []
-  },
-  {
-    name: 'acgnx_g',
-    time: '--',
-    status: '账号未登录',
-    username: '',
-    password: '',
-    enable: true,
-    cookie: []
-  },
-  {
-    name: 'acgnx_a',
-    time: '--',
-    status: '账号未登录',
-    username: '',
-    password: '',
-    enable: true,
-    cookie: []
-  },
-]}
-let db: Low<Data>
+  forum: {username: '', password: ''},
+  info: [
+    {
+      name: 'bangumi',
+      time: '--',
+      status: '账号未登录',
+      username: '',
+      password: '',
+      enable: false,
+      cookies: []
+    },
+    {
+      name: 'nyaa',
+      time: '--',
+      status: '账号未登录',
+      username: '',
+      password: '',
+      enable: false,
+      cookies: []
+    },
+    {
+      name: 'acgrip',
+      time: '--',
+      status: '账号未登录',
+      username: '',
+      password: '',
+      enable: false,
+      cookies: []
+    },
+    {
+      name: 'dmhy',
+      time: '--',
+      status: '账号未登录',
+      username: '',
+      password: '',
+      enable: false,
+      cookies: []
+    },
+    {
+      name: 'acgnx_g',
+      time: '--',
+      status: '账号未登录',
+      username: '',
+      password: '',
+      enable: false,
+      cookies: []
+    },
+    {
+      name: 'acgnx_a',
+      time: '--',
+      status: '账号未登录',
+      username: '',
+      password: '',
+      enable: false,
+      cookies: []
+    }]
+}
 
+//后面会用到
 //等待
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-//获取当前日期函数
+//获取当前日期
 function getNowFormatDate() {
   let date = new Date(),
     year = date.getFullYear(), //获取完整的年份(4位)
@@ -157,13 +132,37 @@ function getNowFormatDate() {
   s = second < 10? `0${second}` : second.toString()
   return `${year}-${m}-${d}T${h}:${mi}:${s}`
 }
+//获取并处理当前时间
+function getCurrentTime() {
+  var stamp= new Date().getTime() + 8 * 60 * 60 * 1000;
+  var currentTime = new Date(stamp).toISOString().replace(/T/, ' ').replace(/\..+/, '').substring(0, 19)
+  return currentTime
+}
+//转义实体字符
+function escapeHtml(str: string) {
+  str = str.replace(/&/g, "&amp;")
+  str = str.replace(/</g, "&lt;")
+  str = str.replace(/>/g, "&gt;")
+  str = str.replace(/"/g, "&quot;")
+  str = str.replace(/'/g, "&#39;")
+  return str
+}
+function unescapeHtml(str: string) {
+  str = str.replace(/&lt;/g , "<")
+  str = str.replace(/&gt;/g , ">")
+  str = str.replace(/&quot;/g , "\"")
+  str = str.replace(/&#39;/g , "\'")
+  str = str.replace(/&amp;/g , "&")
+  return str
+}
 
+const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
 //axios拦截添加cookie和useragent,主站设置认证
 axios.interceptors.request.use(
   config => {
     let type = ''
     if (config.url!.includes('vcb-s.com')) {
-      let key = "Basic " + btoa(db.data.site.username + ':' + db.data.site.password)
+      let key = "Basic " + btoa(userDB.data.forum.username + ':' + userDB.data.forum.password)
       config.headers['Authorization'] = key
       return config
     }
@@ -174,9 +173,9 @@ axios.interceptors.request.use(
     else if (config.url!.includes('share.acgnx.se')) type = 'acgnx_a'
     else if (config.url!.includes('www.acgnx.se')) type = 'acgnx_g'
     else return config
-    const info = db.data.cookies.find(item => item.name == type) as LoginInfo
+    const info = userDB.data.info.find(item => item.name == type) as Config.LoginInfo
     let str = ''
-    info.cookie.forEach(item => {
+    info.cookies.forEach(item => {
       str += `${item.name}=${item.value}; `
     })
     config.headers['Cookie'] = str
@@ -187,9 +186,7 @@ axios.interceptors.request.use(
 )
 //阻止重定向和取消状态码异常
 axios.defaults.maxRedirects = 0
-axios.defaults.validateStatus = function () {
-  return true
-}
+axios.defaults.validateStatus = () => true
 //设置网络错误重试
 axiosRetry(axios, { 
   retries: 5,
@@ -198,1857 +195,16 @@ axiosRetry(axios, {
       return false
     return true
   }
- })
+})
 
-//BT发布
-async function BTPublish(_event, id: number, type: string) {
-  try {
-    let storage = db.data.posts.find(item => item.id == id)
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    if (!fs.existsSync(storage.path)) 
-      throw new Error('FolderNotFound:' + id)
-    const config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-    if (!fs.existsSync(`${storage.path}\\${config.torrentname}`))
-      return 'noSuchFile_torrent'
-    const torrent = fs.readFileSync(`${storage.path}\\${config.torrentname}`)
-    //bangumi团队同步
-    if (type == 'bangumi_all') {
-      if (!fs.existsSync(storage.path + '\\bangumi.html'))
-        return 'noSuchFile_html'
-      let html = fs.readFileSync(storage.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const formData = new FormData()
-      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
-      let team_id: string = team.data[0]._id
-      formData.append('category_tag_id', config.category_bangumi)
-      formData.append('title',  config.title)
-      formData.append('introduction', html)
-      formData.append('tag_ids', config.tag.map(item => item.value).toString())
-      formData.append('btskey', 'undefined')
-      formData.append('team_id', team_id)
-      formData.append('teamsync', '1')
-      formData.append('file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      const response = await axios.post('https://bangumi.moe/api/torrent/add', formData, { responseType: 'json' })
-      if (response.status != 200) throw response
-      if (response.data.success === true) {
-        storage.bangumi = 'https://bangumi.moe/torrent/' + response.data.torrent._id
-        storage.sync = true
-        await sleep(1000)
-        let result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
-        for (let index = 0; index < 5; index++) {
-          if (result.status == 200 && result.data.sync){ 
-            storage.sync = false
-            await db.write()
-            break
-          }
-          await sleep(1000)
-          result = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: response.data.torrent._id}, { responseType: 'json' })
-        }
-        if (storage.sync) return 'success'
-        if (result.data.sync.acgnx != '已存在相同的种子'){
-          storage.acgnx_a = result.data.sync.acgnx
-        }
-        else{
-          if (!storage.acgnx_a)
-            storage.acgnx_a = '种子已存在'
-        }
-        if (result.data.sync.acgnx_int != '已存在相同的种子'){
-          storage.acgnx_g = result.data.sync.acgnx_int
-        }
-        else{
-          if (!storage.acgnx_g)
-            storage.acgnx_g = '种子已存在'
-        }
-        if (result.data.sync.acgrip != '已存在相同的种子'){
-          storage.acgrip = result.data.sync.acgrip
-        }
-        else{
-          if (!storage.acgrip)
-            storage.acgrip = '种子已存在'
-        }
-        if (result.data.sync.dmhy != '已存在相同的种子'){
-          storage.dmhy = result.data.sync.dmhy
-        }
-        else{
-          if (!storage.dmhy)
-            storage.dmhy = '种子已存在'
-        }
-        await db.write()
-        return 'success'
-      }
-      else if (response.data.success === false && (response.data.message as string).includes('torrent same as')) {
-        if (!storage.bangumi) {
-          storage.bangumi = '种子已存在'
-          await db.write()
-        }
-        return 'exist'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    else if (type == 'bangumi') {
-      if (!fs.existsSync(storage.path + '\\bangumi.html'))
-        return 'noSuchFile_html'
-      let html = fs.readFileSync(storage.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const formData = new FormData()
-      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
-      let team_id: string = team.data[0]._id
-      formData.append('category_tag_id', config.category_bangumi)
-      formData.append('title',  config.title)
-      formData.append('introduction', html)
-      formData.append('tag_ids', config.tag.map(item => item.value).toString())
-      formData.append('btskey', 'undefined')
-      formData.append('team_id', team_id)
-      formData.append('file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      const response = await axios.post('https://bangumi.moe/api/torrent/add', formData, { responseType: 'json' })
-      if (response.status != 200) throw response
-      if (response.data.success === true) {
-        storage.bangumi = 'https://bangumi.moe/torrent/' + response.data.torrent._id
-        await db.write()
-        return 'success'
-      }
-      else if (response.data.success === false && (response.data.message as string).includes('torrent same as')) {
-        if (!storage.bangumi) {
-          let id = (response.data.message as string).slice(16)
-          storage.bangumi = 'https://bangumi.moe/torrent/' + id
-          await db.write()
-        }
-        return 'exist'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    else if (type == 'nyaa') {
-      if (!fs.existsSync(storage.path + '\\nyaa.md'))
-        return 'noSuchFile_md'
-      let md = fs.readFileSync(storage.path + '\\nyaa.md', {encoding: 'utf-8'})
-      const formData = new FormData()
-      formData.append('torrent_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      formData.append('display_name', config.title)
-      formData.append('category', config.category_nyaa)
-      formData.append('information', config.information)
-      if (config.completed) 
-        formData.append('is_complete', 'y')
-      if (config.remake) 
-        formData.append('is_remake', 'y')
-      formData.append('description', md)
-      const response = await axios.post('https://nyaa.si/upload', formData, { responseType: 'text' })
-      if ((response.data as string).includes('You should be redirected automatically to target URL')) {
-        storage.nyaa = response.headers['location']
-        await db.write()
-        return 'success'
-      }
-      else if((response.data as string).includes('This torrent already exists')) {
-        if (!storage.nyaa) {
-          let id = (response.data as string).match(/This\storrent\salready\sexists\s\(#(\d+)\)/)![1]
-          storage.nyaa = 'https://nyaa.si/view/' + id
-          await db.write()
-        }
-        return 'exist'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    else if (type == 'dmhy') {
-      if (!fs.existsSync(storage.path + '\\bangumi.html'))
-        return 'noSuchFile_html'
-      let html = fs.readFileSync(storage.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const formData = new FormData()
-      const team = await axios.get('https://www.dmhy.org/team/myteam', { responseType: 'text'})
-      let team_id = (team.data as string).match(/<tbody>[\s\S]*?<td>([\S]*?)<\/td>/)
-      if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
-        formData.append('sort_id', '31')
-      else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
-        formData.append('sort_id', '2')
-      else formData.append('sort_id', '1')
-      formData.append('team_id', team_id ? team_id[1] : '')
-      formData.append('bt_data_title', config.title)
-      let imgsrc = html.match(/<img[\s\S]*?src="([\S]*?)"/)![1]
-      formData.append('poster_url', imgsrc)
-      formData.append('bt_data_intro', html)
-      formData.append('tracker', '')
-      formData.append('MAX_FILE_SIZE', '2097152')
-      formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      formData.append('disable_download_seed_file', '0')
-      formData.append('emule_resource', '')
-      formData.append('synckey', '')
-      formData.append('submit', '提交')
-      const response = await axios.post('https://www.dmhy.org/topics/add', formData, { responseType: 'text' })
-      if (response.status != 200) throw response
-      if ((response.data as string).includes('種子已存在，請不要重複上傳')) {
-        if (!storage.dmhy) {
-          let postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
-          let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
-          var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + rtitle)
-          let src = ''
-          for (let index = 0; index < 5; index++) {
-            let result = (postresult.data as string).match(rule)
-            if (result) {
-              src = result[1]
-              break
-            }
-            await sleep(1000)
-            postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
-          }
-          if (src == '')
-            storage.dmhy = '未找到链接'
-          else 
-            storage.dmhy = 'https://www.dmhy.org' + src
-          await db.write()
-        }
-        return 'exist'
-      }
-      if ((response.data as string).includes('上傳成功')) {
-        //dmhy发布后不会返回发布的链接，需要从管理页获取，但网站数据同步还有延迟
-        let postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
-        let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
-        var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + rtitle)
-        let src = ''
-        for (let index = 0; index < 5; index++) {
-          let result = (postresult.data as string).match(rule)
-          if (result) {
-            src = result[1]
-            break
-          }
-          await sleep(1000)
-          postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
-        }
-        if (src == '')
-          storage.dmhy = '未找到链接'
-        else 
-          storage.dmhy = 'https://www.dmhy.org' + src
-        await db.write()
-        return 'success'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    else if (type == 'acgnx_a') {
-      if (!fs.existsSync(storage.path + '\\bangumi.html'))
-        return 'noSuchFile_html'
-      let html = fs.readFileSync(storage.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const formData = new FormData()
-      formData.append('op', 'upload')
-      if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
-        formData.append('sort_id', '2')
-      else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
-        formData.append('sort_id', '1')
-      else formData.append('sort_id', '19')
-      formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      formData.append('title', config.title)
-      formData.append('intro', html)
-      formData.append('emule_resource', '')
-      formData.append('synckey', '')
-      formData.append('discuss_url', '')
-      formData.append('Anonymous_Post', '0')
-      formData.append('Team_Post', '1')
-      const response = await axios.post('https://share.acgnx.se/user.php?o=upload', formData, { responseType: 'text' })
-      if (response.status != 200) throw response
-      if ((response.data as string).includes('恭喜，資源發佈成功')) {
-        storage.acgnx_a = 'https://share.acgnx.se/' + (response.data as string).match(/href="([\S]*?)">查看發佈的資源/)![1]
-        await db.write()
-        return 'success'
-      }
-      if ((response.data as string).includes('閣下所要上載的Torrent檔案已存在')) {
-        if (!storage.acgnx_a) {
-          let url = (response.data as string).match(/查看原資源詳情：<a\shref="([\S]*?)">/)![1]
-          storage.acgnx_a = 'https://share.acgnx.se/' + url
-          await db.write()
-        }
-        return 'exist'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    else if (type == 'acgnx_g') {
-      if (!fs.existsSync(storage.path + '\\bangumi.html'))
-        return 'noSuchFile_html'
-      let html = fs.readFileSync(storage.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const formData = new FormData()
-      formData.append('op', 'upload')
-      if (config.category_nyaa == '1_2') 
-        formData.append('sort_id', '2')
-      else if (config.category_nyaa == '1_3')
-        formData.append('sort_id', '4')
-      else if (config.category_nyaa == '1_4')
-        formData.append('sort_id', '3')
-      else if (config.category_nyaa == '4_1')
-        formData.append('sort_id', '14')
-      else if (config.category_nyaa == '4_2')
-        formData.append('sort_id', '16')
-      else formData.append('sort_id', '15')
-      formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      formData.append('title', config.title)
-      formData.append('intro', html)
-      formData.append('emule_resource', '')
-      formData.append('synckey', '')
-      formData.append('discuss_url', '')
-      formData.append('tos', '1')
-      formData.append('Anonymous_Post', '0')
-      formData.append('Team_Post', '1')
-      const response = await axios.post('https://www.acgnx.se/user.php?o=upload', formData, { responseType: 'text' })
-      if (response.status != 200) throw response
-      if ((response.data as string).includes('Congratulations, upload success')) {
-        storage.acgnx_g = 'https://www.acgnx.se/' + (response.data as string).match(/href="([\S]*?)">View\sThis\sTorrent/)![1]
-        await db.write()
-        return 'success'
-      }
-      if ((response.data as string).includes('The Torrent file you are going to upload is already there')) {
-        if (!storage.acgnx_g) {
-          let url = (response.data as string).match(/View\soriginal\storrent\sdetails：<a\shref="([\S]*?)">/)![1]
-          storage.acgnx_g = 'https://www.acgnx.se/' + url
-          await db.write()
-        }
-        return 'exist'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    else if (type == 'acgrip') {
-      if (!fs.existsSync(storage.path + '\\acgrip.bbcode'))
-        return 'noSuchFile_bbcode'
-      let bbcode = fs.readFileSync(storage.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
-      const formData = new FormData()
-      //CSRF验证
-      const csrf = await axios.get('https://acg.rip/cp/posts/upload', { responseType: 'text' })
-      let cookievalue = csrf.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
-      db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))!.value = cookievalue
-      await db.write()
-      const token = (csrf.data as string).match(/name="csrf-token"\scontent="([\S]*?)"/)![1]
-      formData.append('authenticity_token', token)
-      if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
-        formData.append('post[category_id]', '5')
-      else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
-        formData.append('post[category_id]', '1')
-      else formData.append('post[category_id]', '9')
-      formData.append('year', date.getFullYear().toString())
-      formData.append('post[series_id]', '0')
-      formData.append('post[torrent]', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentname)
-      formData.append('post[title]', config.title)
-      formData.append('post[post_as_team]', '1')
-      formData.append('post[content]', bbcode)
-      formData.append('commit', '发布')
-      const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text' })
-      if (response.status == 302) { 
-        cookievalue = response.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
-        db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))!.value = cookievalue
-        await db.write()
-        let postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
-        let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
-        let rule = new RegExp('href="([\\S]*?)">' + rtitle)
-        let src = ''
-        for (let index = 0; index < 5; index++) {
-          let result = (postresult.data as string).match(rule)
-          if (result) {
-            src = result[1]
-            break
-          }
-          await sleep(1000)
-          cookievalue = postresult.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
-          db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))!.value = cookievalue
-          await db.write()
-          postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
-        }
-        if (src == '')
-          storage.acgrip = '未找到链接'
-        else
-          storage.acgrip = 'https://acg.rip' + src
-        await db.write()
-        return 'success'
-      }
-      if ((response.data as string).includes('已存在相同的种子')) {
-        if (!storage.acgrip) {
-          let postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
-          let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
-          let rule = new RegExp('href="([\\S]*?)">' + rtitle)
-          let src = ''
-          for (let index = 0; index < 5; index++) {
-            let result = (postresult.data as string).match(rule)
-            if (result) {
-              src = result[1]
-              break
-            }
-            await sleep(1000)
-            cookievalue = postresult.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
-            db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))!.value = cookievalue
-            await db.write()
-            postresult = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
-          }
-          if (src == '')
-            storage.acgrip = '未找到链接'
-          else
-            storage.acgrip = 'https://acg.rip' + src
-          await db.write()
-        }
-        return 'exist'
-      }
-      else {
-        console.log(response)
-        return 'failed'
-      }
-    }
-    return 'failed'
-  } catch (err) {
-    console.log(err)
-    return 'failed'
-  }
-}
+/*
+  主窗口设置
+*/
 
-//主站发布
-async function sitePublish(_event, id: number, title: string, content: string, imgsrc: string, categories: string) {
-  try{
-    if (!fs.existsSync(imgsrc)) {
-      return 'noSuchFile_webp'
-    }
-    const img = fs.readFileSync(imgsrc)
-    let imgData = new FormData()
-    imgData.append('file', new Blob([img]), imgsrc.replace(/^.*[\\\/]/, ''))
-    const result = await axios.post('https://vcb-s.com/wp-json/wp/v2/media', imgData, { responseType: 'json' })
-    if (result.status == 401) return 'unauthorized'
-    if (result.status != 201) throw result
-    let data = {
-      title: title,
-      content: content,
-      status: 'publish',
-      format: 'standard',
-      categories: JSON.parse(categories),
-      featured_media: result.data.id
-    }
-    const response = await axios.post('https://vcb-s.com/wp-json/wp/v2/posts', data, {responseType: 'json'})
-    if (response.status == 201) {
-      db.data.posts.find((item) => item.id == id)!.site = response.data.link
-      return 'success'
-    }
-    if (response.status == 400) return 'empty'
-    throw response
-  }
-  catch (err) {
-    console.log(err)
-    return 'failed'
-  }
-}
-
-//RS主站发布
-async function siteRSPublish(_event, id: number, rsID: number, title: string, content: string) {
-  try{
-    let data = {
-      date: getNowFormatDate(),
-      title: title,
-      content: content,
-    }
-    const response = await axios.patch('https://vcb-s.com/wp-json/wp/v2/posts/' + rsID, data, {responseType: 'json'})
-    if (response.status == 200) {
-      db.data.posts.find((item) => item.id == id)!.site = response.data.link
-      return 'success'
-    }
-    if (response.status == 400) return 'empty'
-    if (response.status == 401) return 'unauthorized'
-    throw response
-  }
-  catch (err) {
-    console.log(err)
-    return 'failed'
-  }
-}
-
-//获取Bangumi标签建议
-async function getBangumiTags(_event, query: string) {
-  try{
-    const response = await axios.post('https://bangumi.moe/api/tag/suggest', {query: query})
-    return  {data: response.data, status: response.status} 
-  }
-  catch(err){
-    log.error(err)
-    return {data: (err as any).name, status: 0}
-  }
-}
-async function searchBangumiTags(_event, query: string) {
-  try{
-    const response = await axios.post('https://bangumi.moe/api/tag/search', {name: query, multi: true, keywords: true})
-    return  {data: response.data, status: response.status} 
-  }
-  catch(err){
-    log.error(err)
-    return {data: (err as any).name, status: 0}
-  }
-}
-
-//RS搜索文章
-async function searchPosts(_event, title: string) {
-  let result: Message_rsPosts[] = []
-  const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?context=edit&search=' + title, { responseType: 'json' })
-  response.data.forEach(item => {
-    result.push({
-      id: item.id,
-      title: item.title.rendered,
-      content: item.content.rendered.split('<!--more-->')[0],
-      raw: item.content.raw
-    })
-  })
-  return result
-}
-
-//登录窗口设置
-async function createLoginWindow(type: string) {
-
-  let url:string
-  if (type == 'bangumi') url = 'https://bangumi.moe'
-  else if (type == 'nyaa') url = 'https://nyaa.si/login'
-  else if (type == 'acgrip') url = 'https://acg.rip/users/sign_in'
-  else if (type == 'dmhy') url = 'https://www.dmhy.org/user'
-  else if (type == 'acgnx_g') url = 'https://www.acgnx.se/user.php?o=login'
-  else url = 'https://share.acgnx.se/user.php?o=login'
-
-  const partition = 'persist:login'
-  let ses = session.fromPartition(partition)
-
-  //获取并保存cookie信息
-  async function setCookies(type: string, url: string) {
-    await ses.cookies.get({url: url}).then((cookies) => {
-      db.data.cookies.find(item => item.name == type)!.cookie = cookies
-    }).catch(err => {console.log(err)})
-    if (type.includes('acgnx'))
-      await ses.cookies.get({name: 'cf_clearance'}).then((cookies) => {
-        db.data.cookies.find(item => item.name == type)!.cookie.push(...cookies)
-    }).catch(err => {console.log(err)})
-    await db.write()
-  }
-
-  const loginWindow = new BrowserWindow({
-    width: 1200,
-    minWidth: 950,
-    minHeight: 550,
-    height: 600,
-    autoHideMenuBar: true,
-    show: false,
-    icon: appIcon,
-    webPreferences: {
-      partition: partition
-    },
-  })
-
-  loginWindow.on('ready-to-show', async () => {
-    loginWindow.show()
-  })
-  
-  loginWindow.on('close', async (e) => {
-    try{
-      e.preventDefault()
-      await setCookies(type, url)
-      await checkLoginStatus(type)
-      //告知页面刷新数据
-      mainWindowWebContent.send('refreshLoginData')
-    }
-    catch(err){
-      console.log(err)
-    }
-    finally{
-      loginWindow.destroy()
-    }
-  })
-
-  //拦截设置useragent
-  ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['User-Agent'] = userAgent
-    callback({ requestHeaders: details.requestHeaders })
-  })
-
-  //配置代理
-  let pconf = db.data.proxyConfig
-  if (pconf.status) {
-    await loginWindow.webContents.session.setProxy({ 
-      proxyRules: `${pconf.type}://${pconf.host}:${pconf.port}` 
-    });
-  }
-
-  loginWindow.loadURL(url)
-}
-
-//获取并处理当前时间
-function getCurrentTime() {
-  var stamp= new Date().getTime() + 8 * 60 * 60 * 1000;
-  var currentTime = new Date(stamp).toISOString().replace(/T/, ' ').replace(/\..+/, '').substring(0, 19)
-  return currentTime
-}
-
-//响应前端检查
-async function checkLogin(type: string, value?: string) {
-  if (type == 'all') {
-    checkLogin('bangumi')
-    checkLogin('nyaa')
-    checkLogin('dmhy')
-    checkLogin('acgrip')
-    checkLogin('acgnx_a')
-    checkLogin('acgnx_g')
-  }
-  else {
-    if (!value)
-      await checkLoginStatus(type)
-    let status = db.data.cookies.find((item) => item.name == type)!.status
-    if (status == '账号未登录' || value) {
-      BTLogin(type, value)
-    }
-  }
-}
-//判断登陆状态
-async function checkLoginStatus(type: string) {
-  try{
-    let item: LoginInfo = db.data.cookies.find(item => item.name === type)!
-    if (!item.enable) {
-      item.time = getCurrentTime()
-      item.status = '账户已禁用'
-    } 
-    else {
-      let url:string
-      if (type == 'bangumi') {
-        url = 'https://bangumi.moe/api/team/myteam'
-        let response = await axios.get(url, { responseType: 'text' })
-        for (let i = 0;i < 5;i++) {
-          if (response.status === 200) {
-            break
-          }
-          response = await axios.get(url, { responseType: 'text' })
-        }
-        const {data, status} = response
-        if (status != 200) {
-          throw response
-        }
-        if (data == '[]') {
-          item.time = getCurrentTime()
-          item.status = '账号未登录'
-        }
-        else {
-          item.time = getCurrentTime()
-          item.status = '账号已登录'
-        }
-      }
-      else if (type == 'nyaa') {
-        url = 'https://nyaa.si/profile'
-        let response = await axios.get(url, { responseType: 'text' })
-        for (let i = 0;i < 5;i++) {
-          if (response.status === 200 || response.status === 302) {
-            break
-          }
-          response = await axios.get(url, { responseType: 'text' })
-        }
-        const {status} = response
-        if (status == 302) {
-          item.time = getCurrentTime()
-          item.status = '账号未登录'
-        }
-        else if (status == 200) {
-          item.time = getCurrentTime()
-          item.status = '账号已登录'
-        }
-        else {
-          throw response
-        }
-      }
-      else if (type == 'acgrip') {
-        url = 'https://acg.rip/cp'
-        let response = await axios.get(url, { responseType: 'text' })
-        for (let i = 0;i < 5;i++) {
-          if (response.status === 200 || response.status === 302) {
-            break
-          }
-          response = await axios.get(url, { responseType: 'text' })
-        }
-        const {status} = response
-        if (status == 302) {
-          item.time = getCurrentTime()
-          item.status = '账号未登录'
-        }
-        else if (status == 200) {
-          item.time = getCurrentTime()
-          item.status = '账号已登录'
-        }
-        else {
-          throw response
-        }
-      }
-      else if (type == 'dmhy') {
-        url = 'https://www.dmhy.org/user'
-        let response = await axios.get(url, { responseType: 'text' })
-        for (let i = 0;i < 5;i++) {
-          if (response.status === 200 || response.status === 302) {
-            break
-          }
-          response = await axios.get(url, { responseType: 'text' })
-        }
-        const {status} = response
-        if (status == 302) {
-          item.time = getCurrentTime()
-          item.status = '账号未登录'
-        }
-        else if (status == 200) {
-          item.time = getCurrentTime()
-          item.status = '账号已登录'
-        }
-        else {
-          throw response
-        }
-      }
-      else if (type == 'acgnx_g') {
-        url = 'https://www.acgnx.se/user.php'
-        let response = await axios.get(url, { responseType: 'text' })
-        for (let i = 0;i < 5;i++) {
-          if (response.status === 200 || response.status === 302 || response.status === 403) {
-            break
-          }
-          response = await axios.get(url, { responseType: 'text' })
-        }
-        const {data, status} = response
-        if (status == 302) {
-          item.time = getCurrentTime()
-          item.status = '账号未登录'
-        }
-        else if (status == 403) {
-          item.time = getCurrentTime()
-          item.status = '防火墙阻止'
-          createLoginWindow('acgnx_g')
-        }
-        else if (status == 200) {
-          if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
-            item.time = getCurrentTime()
-            item.status = '防火墙阻止'
-            createLoginWindow('acgnx_g')
-          }
-          else {
-            item.time = getCurrentTime()
-            item.status = '账号已登录'
-          }
-        }
-        else {
-          throw response
-        }
-      }
-      else if (type == 'acgnx_a') {
-        url = 'https://share.acgnx.se/user.php'
-        let response = await axios.get(url, { responseType: 'text' })
-        for (let i = 0;i < 5;i++) {
-          if (response.status === 200 || response.status === 302 || response.status === 403) {
-            break
-          }
-          response = await axios.get(url, { responseType: 'text' })
-        }
-        const {data, status} = response
-        if (status == 302) {
-          item.time = getCurrentTime()
-          item.status = '账号未登录'
-        }
-        else if (status == 403) {
-          item.time = getCurrentTime()
-          item.status = '防火墙阻止'
-          createLoginWindow('acgnx_a')
-        }
-        else if (status == 200) {
-          if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
-            item.time = getCurrentTime()
-            item.status = '防火墙阻止'
-          createLoginWindow('acgnx_a')
-          }
-          else {
-            item.time = getCurrentTime()
-            item.status = '账号已登录'
-          }
-        }
-        else {
-          throw response
-        }
-      }
-    }
-    await db.write()
-    mainWindowWebContent.send('refreshLoginData')
-  }
-  catch(err){
-    console.log(err)
-    if (type == 'bangumi') {
-      db.data.cookies[0].time = getCurrentTime()
-      db.data.cookies[0].status = '访问失败'
-    }
-    else if (type == 'nyaa') {
-      db.data.cookies[1].time = getCurrentTime()
-      db.data.cookies[1].status = '访问失败'
-    }
-    else if (type == 'acgrip') {
-      db.data.cookies[2].time = getCurrentTime()
-      db.data.cookies[2].status = '访问失败'
-    }
-    else if (type == 'dmhy') {
-      db.data.cookies[3].time = getCurrentTime()
-      db.data.cookies[3].status = '访问失败'
-    }
-    else if (type == 'acgnx_g') {
-      db.data.cookies[4].time = getCurrentTime()
-      db.data.cookies[4].status = '访问失败'
-    }
-    else {
-      db.data.cookies[5].time = getCurrentTime()
-      db.data.cookies[5].status = '访问失败'}
-    await db.write()
-  }
-}
-//登录账号
-async function BTLogin(type: string, value?: string) {
-  try {
-    let url: string
-    const partition = 'persist:login'
-    let ses = session.fromPartition(partition)
-    if (type == 'bangumi') {
-      db.data.cookies[0].time = getCurrentTime()
-      db.data.cookies[0].status = '正在登录'
-      await db.write()
-      mainWindowWebContent.send('refreshLoginData')
-      url = 'https://bangumi.moe/api/user/signin'
-      let uname = db.data.cookies[0].username
-      let pwd = db.data.cookies[0].password
-      let response = await axios.post(url, {username: uname, password: CryptoJS.MD5(pwd).toString()})
-      if (response.data.success) {
-        response.headers['set-cookie']!.forEach(async item => {
-          let cookie = item.split(';')[0]
-          let index = cookie.indexOf('=')
-          let name = cookie.slice(0, index)
-          let value = cookie.slice(index + 1, cookie.length)
-          await ses.cookies.set({url: 'https://bangumi.moe', name: name, value: value, httpOnly: true})
-        });
-        await ses.cookies.get({url: 'https://bangumi.moe'}).then((cookies) => {
-          db.data.cookies[0].cookie.push(...cookies)
-        }).catch(err => {console.log(err)})
-        db.data.cookies[0].time = getCurrentTime()
-        db.data.cookies[0].status = '账号已登录'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else {
-        db.data.cookies[0].time = getCurrentTime()
-        db.data.cookies[0].status = '账号密码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-    }
-    else if (type == 'acgrip') {
-      db.data.cookies[2].time = getCurrentTime()
-      db.data.cookies[2].status = '正在登录'
-      await db.write()
-      mainWindowWebContent.send('refreshLoginData')
-      url = 'https://acg.rip/users/sign_in'
-      const formData = new FormData()
-      //CSRF验证
-      const csrf = await axios.get(url, { responseType: 'text' })
-      let cookievalue = csrf.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
-      let _kanako_session = db.data.cookies[2].cookie.find((item => item.name == '_kanako_session'))
-      if (_kanako_session)
-        _kanako_session.value = cookievalue
-      else 
-        db.data.cookies[2].cookie.push({name: '_kanako_session', value: cookievalue, sameSite: 'lax'})
-      await db.write()
-      const token = (csrf.data as string).match(/name="csrf-token"\scontent="([\S]*?)"/)![1]
-      formData.append('authenticity_token', token)
-      let uname = db.data.cookies[2].username
-      let pwd = db.data.cookies[2].password
-      formData.append('user[email]', uname)
-      formData.append('user[password]', pwd)
-      formData.append('user[remember_me]', '1')
-      formData.append('commit', '登录')
-      let response = await axios.post(url, formData, { responseType: 'text' })
-      if (response.status == 302) {
-        response.headers['set-cookie']!.forEach(async item => {
-          let cookie = item.split(';')[0]
-          let index = cookie.indexOf('=')
-          let name = cookie.slice(0, index)
-          let value = cookie.slice(index + 1, cookie.length)
-          await ses.cookies.set({url: 'https://acg.rip', name: name, value: value, httpOnly: true})
-        });
-        await ses.cookies.get({url: 'https://acg.rip'}).then((cookies) => {
-          db.data.cookies[2].cookie.push(...cookies)
-        }).catch(err => {console.log(err)})
-        db.data.cookies[2].time = getCurrentTime()
-        db.data.cookies[2].status = '账号已登录'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else if ((response.data as string).includes('邮箱或密码错误')) {
-        db.data.cookies[2].time = getCurrentTime()
-        db.data.cookies[2].status = '账号密码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'dmhy') {
-      db.data.cookies[3].time = getCurrentTime()
-      db.data.cookies[3].status = '正在登录'
-      await db.write()
-      mainWindowWebContent.send('refreshLoginData')
-      url = 'https://www.dmhy.org/user/login'
-      if (!value) {
-        const result = await axios.get('https://www.dmhy.org/common/generate-captcha?code=' + Date.now())
-        if (result.headers['set-cookie']) {
-          result.headers['set-cookie']!.forEach(async item => {
-            let cookie = item.split(';')[0]
-            let index = cookie.indexOf('=')
-            let name = cookie.slice(0, index)
-            let value = cookie.slice(index + 1, cookie.length)
-            await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true})
-          });
-          await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
-            db.data.cookies[3].cookie.push(...cookies)
-          }).catch(err => {console.log(err)})
-          db.write()
-        }
-        mainWindowWebContent.send('loadIamgeCaptcha')
-        return
-      }
-      let uname = db.data.cookies[3].username
-      let pwd = db.data.cookies[3].password
-      const formData = new FormData()
-      formData.append('goto', 'https://www.dmhy.org/')
-      formData.append('email', uname)
-      formData.append('password', pwd)
-      formData.append('login_node', '0')
-      formData.append('cookietime', '315360000')
-      formData.append('captcha_code', value)
-      let response = await axios.post(url, formData, { responseType: 'text' })
-      if ((response.data as string).includes('登入成功')) {
-        response.headers['set-cookie']!.forEach(async item => {
-          let cookie = item.split(';')[0]
-          let index = cookie.indexOf('=')
-          let name = cookie.slice(0, index)
-          let value = cookie.slice(index + 1, cookie.length)
-          await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true})
-        });
-        await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
-          db.data.cookies[3].cookie.push(...cookies)
-        }).catch(err => {console.log(err)})
-        db.data.cookies[3].time = getCurrentTime()
-        db.data.cookies[3].status = '账号已登录'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else if ((response.data as string).includes('帐户密码错误')) {
-        db.data.cookies[3].time = getCurrentTime()
-        db.data.cookies[3].status = '账号密码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else if ((response.data as string).includes('验证码错误')) {
-        db.data.cookies[3].time = getCurrentTime()
-        db.data.cookies[3].status = '验证码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'nyaa') {
-      db.data.cookies[1].time = getCurrentTime()
-      db.data.cookies[1].status = '正在登录'
-      await db.write()
-      mainWindowWebContent.send('refreshLoginData')
-      if (!value) {
-        mainWindowWebContent.send('loadReCaptcha', 'nyaa')
-        return
-      }
-      url = 'https://nyaa.si/login'
-      const formData = new FormData()
-      let uname = db.data.cookies[1].username
-      let pwd = db.data.cookies[1].password
-      formData.append('username', uname)
-      formData.append('password', pwd)
-      formData.append('g-recaptcha-response', value)
-      let response = await axios.post(url, formData, { responseType: 'text' })
-      if (response.status == 302) {
-        response.headers['set-cookie']!.forEach(async item => {
-          let cookie = item.split(';')[0]
-          let index = cookie.indexOf('=')
-          let name = cookie.slice(0, index)
-          let value = cookie.slice(index + 1, cookie.length)
-          await ses.cookies.set({url: 'https://nyaa.si', name: name, value: value, httpOnly: true})
-        });
-        await ses.cookies.get({url: 'https://nyaa.si'}).then((cookies) => {
-          db.data.cookies[1].cookie.push(...cookies)
-        }).catch(err => {console.log(err)})
-        db.data.cookies[1].time = getCurrentTime()
-        db.data.cookies[1].status = '账号已登录'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else if ((response.data as string).includes('Incorrect username or password')) {
-        db.data.cookies[1].time = getCurrentTime()
-        db.data.cookies[1].status = '账号密码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'acgnx_g') {
-      db.data.cookies[4].time = getCurrentTime()
-      db.data.cookies[4].status = '正在登录'
-      await db.write()
-      mainWindowWebContent.send('refreshLoginData')
-      if (!value) {
-        mainWindowWebContent.send('loadReCaptcha', 'acgnx_g')
-        return
-      }
-      url = 'https://www.acgnx.se/user.php?o=login'
-      const formData = new FormData()
-      let uname = db.data.cookies[4].username
-      let pwd = db.data.cookies[4].password
-      formData.append('op', 'login')
-      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
-      formData.append('emailaddress', uname)
-      formData.append('password', pwd)
-      formData.append('cookietime', '315360000')
-      formData.append('g-recaptcha-response', value)
-      let response = await axios.post(url, formData, { responseType: 'text' })
-      if (response.status == 302) {
-        response.headers['set-cookie']!.forEach(async item => {
-          let cookie = item.split(';')[0]
-          let index = cookie.indexOf('=')
-          let name = cookie.slice(0, index)
-          let value = cookie.slice(index + 1, cookie.length)
-          await ses.cookies.set({url: 'https://www.acgnx.se', name: name, value: value, httpOnly: true})
-        });
-        await ses.cookies.get({url: 'https://www.acgnx.se'}).then((cookies) => {
-          db.data.cookies[4].cookie.push(...cookies)
-        }).catch(err => {console.log(err)})
-        db.data.cookies[4].time = getCurrentTime()
-        db.data.cookies[4].status = '账号已登录'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else if ((response.data as string).includes('登錄密碼不正確')) {
-        db.data.cookies[4].time = getCurrentTime()
-        db.data.cookies[4].status = '账号密码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else {
-        throw response
-      }
-    }
-    else if (type == 'acgnx_a') {
-      db.data.cookies[5].time = getCurrentTime()
-      db.data.cookies[5].status = '正在登录'
-      await db.write()
-      mainWindowWebContent.send('refreshLoginData')
-      if (!value) {
-        mainWindowWebContent.send('loadReCaptcha', 'acgnx_a')
-        return
-      }
-      url = 'https://share.acgnx.se/user.php?o=login'
-      const formData = new FormData()
-      let uname = db.data.cookies[5].username
-      let pwd = db.data.cookies[5].password
-      formData.append('op', 'login')
-      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
-      formData.append('emailaddress', uname)
-      formData.append('password', pwd)
-      formData.append('cookietime', '315360000')
-      formData.append('g-recaptcha-response', value)
-      let response = await axios.post(url, formData, { responseType: 'text' })
-      if (response.status == 302) {
-        response.headers['set-cookie']!.forEach(async item => {
-          let cookie = item.split(';')[0]
-          let index = cookie.indexOf('=')
-          let name = cookie.slice(0, index)
-          let value = cookie.slice(index + 1, cookie.length)
-          await ses.cookies.set({url: 'https://share.acgnx.se', name: name, value: value, httpOnly: true})
-        });
-        await ses.cookies.get({url: 'https://share.acgnx.se'}).then((cookies) => {
-          db.data.cookies[5].cookie.push(...cookies)
-        }).catch(err => {console.log(err)})
-        db.data.cookies[5].time = getCurrentTime()
-        db.data.cookies[5].status = '账号已登录'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else if ((response.data as string).includes('登錄密碼不正確')) {
-        db.data.cookies[5].time = getCurrentTime()
-        db.data.cookies[5].status = '账号密码错误'
-        await db.write()
-        mainWindowWebContent.send('refreshLoginData')
-      }
-      else {
-        throw response
-      }
-    }
-  }
-  catch (err) {
-    console.log(err)
-  }
-}
-
-//获取登录信息
-async function getLoginInfo(_event) {
-  let result: Message_LoginInfo[] = []
-  const info = db.data.cookies
-  info.forEach(item => {
-    result.push({
-      name: item.name, 
-      time: item.time, 
-      status: item.status, 
-      username: item.username, 
-      password: item.password, 
-      enable: item.enable,
-    })
-  })
-  return JSON.stringify(result)
-}
-
-//读取或设置主站用户密码
-async function setSiteUAP(_event, op: boolean, username: string, password: string) {
-  let config = db.data.site
-  if (op) {
-    config.username = username
-    config.password = password
-    await db.write()
-  }
-  return [config.username, config.password]
-}
-
-//导入导出Cookies
-async function exportCookies(_event, type: number) {
-  const { canceled, filePath } = await dialog.showSaveDialog({filters: [{name: 'JSON', extensions: ['json']}]})
-  if (canceled) return
-  fs.writeFileSync(filePath, JSON.stringify(db.data.cookies[type].cookie))
-}
-async function importCookies(_event, type: number) {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties: ['openFile'], 
-    filters: [{name: 'JSON', extensions: ['json']}]
-  })
-  if (canceled) return
-  db.data.cookies[type].cookie = JSON.parse(fs.readFileSync(filePaths[0], {encoding: 'utf-8'}))
-  db.write()
-  mainWindowWebContent.send('refreshLoginData')
-}
-
-//打开项目目录
-async function openDirectory(_event, path: string){
-  shell.openPath(path)
-}
-
-//打开文件(夹)
-async function handleFileOpen(_event, type: string) {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties:[ type == 'folder' ? 'openDirectory' : 'openFile' ],
-    filters: type == 'folder' ? undefined : [{name: type, extensions:[type]}]
-  })
-  if (!canceled) {
-    return filePaths[0]
-  }
-  return ''
-}
-
-//读取文件内容
-async function readFileContent(_event) {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties:[ 'openFile' ]
-  })
-  if(canceled) return ''
-  const content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
-  return content
-}
-
-//创建新任务
-async function createTask(_event, path: string, config: PublishConfig) {
-  try{
-    if (path === "") {
-      path = app.getPath('userData') + '\\task'
-      if (!fs.existsSync(path))
-        fs.mkdirSync(path)
-    }
-    if (!fs.existsSync(path)) {
-      return 'noSuchFolder'
-    }
-    else{
-      if (config.name == '')
-        config.name = getNowFormatDate().replace(/:/g, '-')
-      fs.mkdirSync(path + '\\' +  config.name)
-      if (config.type == 'text') {
-        const text: Content_text = {
-          Name_Ch: '',
-          Name_En: '',
-          Name_Jp: '',
-          bit: '10-bit',
-          resolution: '1080p',
-          encoding: 'HEVC',
-          torrent_type: 'BDRip',
-          reseed: false,
-          nomination: false,
-          note: [],
-          comment_Ch: '',
-          comment_En: '',
-          rs_version: 1,
-          members: {
-            script: '',
-            encode: '',
-            collate: '',
-            upload: ''
-          },
-          picture_path: '',
-          prefill: false
-        }
-        config.content = text
-      }
-      else {
-        const file: Content_file = {
-          path_md: '',
-          path_html: '',
-          path_bbcode: '',
-        }
-        config.content = file
-      }
-      fs.writeFileSync(path + '\\' +  config.name + '\\config.json', JSON.stringify(config))
-      let id = Date.now()
-      db.data.posts.push({
-        id: id,
-        name: config.name,
-        path: path + '\\' + config.name,
-        status: 'publishing',
-        step: 'create',
-        sync: false
-      })
-      await db.write()
-      return 'success:' + id
-    }
-  }
-  catch(err){
-    dialog.showErrorBox('错误', (err as Error).message)
-    return 'failed'
-  }
-}
-
-//创建和保存
-async function saveConfig(id: number, config: PublishConfig) {
-  let storage = db.data.posts.find(item => item.id == id)
-  if (storage == undefined) return "taskNotFound"
-  const oldConfig: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-  config.name = oldConfig.name;
-  config.torrentname = config.torrent.replace(/^.*[\\\/]/, '');
-  fs.writeFileSync(storage.path + '\\config.json', JSON.stringify(config))
-  return storage.path
-}
-async function createWithFile(_event, id: number, config_: string) {
-  try {
-    let config: PublishConfig = JSON.parse(config_)
-    const result = await saveConfig(id, config)
-    if (result == 'taskNotFound') return 'taskNotFound'
-    if (!fs.existsSync(config.torrent)) return "noSuchFile_torrent"
-    if (!fs.existsSync((config.content as Content_file).path_html))
-      return "noSuchFile_html"
-    else 
-      fs.copyFileSync((config.content as Content_file).path_html, result + '\\bangumi.html')
-    if (!fs.existsSync((config.content as Content_file).path_md)) {
-      if ((config.content as Content_file).path_md != '') 
-        return 'noSuchFile_md'
-      let content = fs.readFileSync(result + '\\bangumi.html', {encoding: 'utf-8'})
-      var converter = new html2md()
-      let md = converter.turndown(content)
-      fs.writeFileSync(result + '\\nyaa.md', md)
-    } else
-      fs.copyFileSync((config.content as Content_file).path_html, result + '\\bangumi.html')
-    if (!fs.existsSync((config.content as Content_file).path_bbcode)) {
-      if ((config.content as Content_file).path_bbcode != '') 
-        return 'noSuchFile_bbcode'
-      let content = fs.readFileSync(result + '\\nyaa.md', {encoding: 'utf-8'})
-      let reader = new commonmark.Parser()
-      let writer = new md2bbc.BBCodeRenderer()
-      let parsed = reader.parse(content)
-      let bbcode = writer.render(parsed)
-      fs.writeFileSync(result + '\\acgrip.bbcode', bbcode)
-    } else
-      fs.copyFileSync((config.content as Content_file).path_bbcode, result + '\\acgrip.bbcode')
-    fs.copyFileSync(config.torrent, result + '\\' + config.torrent.replace(/^.*[\\\/]/, ''))
-    return 'success'
-  } catch (err) {
-    dialog.showErrorBox('错误', (err as Error).message)
-    return 'failed'
-  }
-}
-async function createWithText(_event, id: number, config_: string) {
-  try {
-    let config: PublishConfig = JSON.parse(config_)
-    let info = config.content as Content_text
-    const result = await saveConfig(id, config)
-    if (result == 'taskNotFound') return 'taskNotFound'
-    if (!fs.existsSync(config.torrent)) return "noSuchFile_torrent"
-    let content = '<p>\n'
-    content += `<img src="${info.picture_path}" alt="${info.picture_path.replace(/^.*[\\\/]/, '')}" /><br />\n<br />\n`
-    let note = ''
-    if (info.note)
-      info.note.forEach(item => { note += item + ' + ' })
-    if (note != '')
-      note = note.slice(0, -2)
-    let reseed = info.reseed ? ` Reseed${info.rs_version > 1 ? ` v${info.rs_version}` : ''}` : ''
-    if (config.title.includes(info.Name_Jp)) {
-      if (info.Name_Ch != '')
-        content += info.Name_Ch + ' / '
-      content += info.Name_En
-      if (info.Name_Jp != '')
-        content += ` / ${info.Name_Jp} `
-      content += ` ${note} ${info.torrent_type}${reseed} <br />\n`
-    }
-    else {
-      if (info.Name_Ch != '') 
-        content += `${info.Name_Ch} ${note} ${info.torrent_type}${reseed} <br />\n`
-      content += `${info.Name_En} ${note} ${info.torrent_type}${reseed} <br />\n`
-      if (info.Name_Jp != '') 
-        content += `${info.Name_Jp} ${note} ${info.torrent_type}${reseed} <br />\n`
-    }
-    content += '<br />\n'
-    if (info.sub_Ch && info.sub_Ch != '') {
-      content += `${info.sub_Ch}<br />\n${info.sub_En}<br />\n`
-    }
-    if (info.audio_Ch && info.audio_Ch != '') {
-      content += `${info.audio_Ch}<br />\n${info.audio_En}<br />\n`
-    }
-    if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
-    if (info.nomination) {
-      content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。<br />\n'
-      content += 'This project was <strong>nominated by our members</strong> and produced upon request. Thanks to them for their selfless dedication to the development of VCB-Studio.<br />\n<br />\n'
-    }
-    let team_Ch = '', team_En = ''
-    if (info.subTeam_Ch && info.subTeam_En) {
-      info.subTeam_Ch.forEach(item => { team_Ch += item + ' & ' })
-      info.subTeam_En.forEach(item => { team_En += item + ' & ' })
-    }
-    if (team_Ch != ''){
-      team_Ch = team_Ch.slice(0, -3)
-      team_En = team_En.slice(0, -3)
-      content += `这个项目与 <strong>${team_Ch}</strong> 合作，感谢他们精心制作的字幕。<br />\n`
-      content += `This project is in collaboration with <strong>${team_En}</strong>. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
-    }
-    let comment_Ch = info.comment_Ch.split('\n')
-    let comment_En = info.comment_En.split('\n')
-    for (let i = 0; i <comment_Ch.length; i++){
-      content += comment_Ch[i] + '<br />\n'
-      content += comment_En[i] + '<br />\n<br />\n'
-    }
-    if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
-    if (info.nonsense) {
-      let nonsense = info.nonsense.split('\n')
-      nonsense.forEach(item => {
-        content += item + '<br />\n'
-      });
-    }
-    if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
-    content += '</p>\n<hr />\n<p>\n'
-    if (info.reseed) {
-      let rs_comment_Ch = info.rs_comment_Ch!.split('\n')
-      let rs_comment_En = info.rs_comment_En!.split('\n')
-      content += '重发修正：<br />\n'
-      rs_comment_Ch.forEach(item => {
-        content += item + '<br />\n'
-      });
-      content += '<br />\nReseed comment:<br />\n'
-      rs_comment_En.forEach(item => {
-        content += item + '<br />\n'
-      });
-      content += '<br />\n</p>\n<hr />\n<p>\n'
-    }
-    content += '感谢所有参与制作者 / Thanks to our participating members:<br />\n'
-    content += '总监 / Script: ' + info.members.script + '<br />\n'
-    content += '压制 / Encode: ' + info.members.encode + '<br />\n'
-    content += '整理 / Collate: ' + info.members.collate + '<br />\n'
-    content += '发布 / Upload: ' + info.members.upload + '<br />\n'
-    content += '分流 / Seed: VCB-Studio CDN 分流成员<br />\n'
-    if (info.providers && info.providers != '') {
-      let providers = info.providers.split('\n')
-      content += '<br />\n感谢所有资源提供者 / Thanks to all resource providers:<br />\n'
-      providers.forEach(item => {
-        content += item + '<br />\n'
-      });
-    }
-    content += '<br />\n</p>\n<hr />\n<p>\n'
-    if (info.reseed) {
-      content += '本次发布来自 VCB-Studio 旧作重发计划。我们会不定期重发过去发布过的合集，或为补充做种，或为修正制作错漏，或为整合系列合集。<br />\n'
-      content += 'This is a release of VCB-Studio Reseed Project. We would re-upload previous torrents from time to time, to resurrect old torrents with few seeders, to correct errors/omissions, or to batch separate releases that belong to a same series.<br />\n'
-      content += '<br />\n</p>\n<hr />\n<p>\n'
-    }
-    if (!info.reseed) {
-      content += ' VCB-Studio 已不再保证收集作品相关 CD 和扫图资源，详情请参见 <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a>。<br />\n'
-      content += 'Please refer to <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a> on VCB-Studio no longer guaranteeing the inclusion of relevant CDs and scans.<br />\n<br />\n'
-      content += '本组（不）定期招募新成员。详情请参见 <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a>。<br />\n'
-      content += 'Please refer to <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a> for information on our (un)scheduled recruitment.<br />\n<br />\n'
-    }
-    content += '播放器教程索引： <a href="https://vcb-s.com/archives/16639" target="_blank">VCB-Studio 播放器推荐</a><br />\n'
-    content += '中文字幕分享区： <a href="https://bbs.acgrip.com/" target="_blank">Anime 分享论坛</a><br />\n'
-    content += '项目计划与列表： <a href="https://vcb-s.com/archives/138" target="_blank">VCB-Studio 项目列表</a><br />\n'
-    content += '特殊格式与说明： <a href="https://vcb-s.com/archives/7949" target="_blank">WebP 扫图说明</a><br />\n<br />\n</p>\n'
-    if (!info.reseed) {
-      content += '<hr />\n'
-    }
-    let converter = new html2md()
-    let md = converter.turndown(content)
-    let reader = new commonmark.Parser()
-    let bbcodeWriter = new md2bbc.BBCodeRenderer()
-    let parsed_bbcode = reader.parse(md)
-    let bbcode = bbcodeWriter.render(parsed_bbcode)
-    let html = content
-    if (!info.reseed) {
-      md += '\n\n' +  info.pictures_md
-      html += info.pictures_html
-      info.pictures_bbcode = info.pictures_bbcode!.replace(/IMG/g, 'img')
-      info.pictures_bbcode = info.pictures_bbcode!.replace(/URL/g, 'url')
-      bbcode += info.pictures_bbcode
-    }
-    fs.writeFileSync(result + '\\bangumi.html', html)
-    fs.writeFileSync(result + '\\nyaa.md', md)
-    fs.writeFileSync(result + '\\acgrip.bbcode', bbcode)
-    fs.copyFileSync(config.torrent, result + '\\' + config.torrent.replace(/^.*[\\\/]/, ''))
-    return 'success'
-  } catch (err) {
-    dialog.showErrorBox('错误', (err as Error).message)
-    return 'failed'
-  }
-}
-async function saveContent(_event, id: number, config_: string) {
-  let config: PublishConfig = JSON.parse(config_)
-  const result = await saveConfig(id, config)
-  if (result == 'taskNotFound') return 'taskNotFound'
-  else return 'success'
-}
-
-//创建时打开任务 / 获取任务信息
-async function openTask(_event, id: number) {
-  try{
-    let storage = db.data.posts.find(item => item.id == id)
-    if (storage == undefined) return {status: 'notFound'}
-    db.data.posts.find(item => item.id == id)!.step = 'create'
-    await db.write()
-    if (!fs.existsSync(storage.path)) return {status: 'folderNotFound'}
-    const config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-    return {status: config.type, config: config}
-  }
-  catch(err){
-    dialog.showErrorBox('错误', (err as Error).message)
-    return {status: 'failed'}
-  }
-}
-
-//从url.txt加载对比图
-async function loadFromTxt(_event) {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties:[ 'openFile' ],
-    filters: [{name: 'txt', extensions:['txt']}]
-  })
-  if (canceled) return new String[3]
-  let content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
-  let html = content.match(/<p>[\s\S]*<\/p>/)![0]
-  let md = content.match(/\[!\[\]\([\s\S]*\)\s\s/)![0]
-  let bbcode = content.match(/\[URL=[\s\S]*\[\/URL\]/)![0]
-  const str = 'Comparison (right click on the image and open it in a new tab to see the full-size one)\n'
-            + content.match(/<br\/>[\s\S]*?<br\/>/)![0].slice(5).slice(0, -5).trim() + '\n\n' 
-  html += '\n'
-  md = str + md
-  bbcode = str + bbcode + '\n'
-  bbcode = bbcode.replace(/IMG/g, 'img')
-  bbcode = bbcode.replace(/URL/g, 'url')
-  return [html, md, bbcode]
-} 
-
-//复查任务
-async function checkTask(_event, id: number) {
-  try {
-    let storage = db.data.posts.find(item => item.id == id)
-    let html = '', md = '', bbcode = '', title = ''
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    storage.step = 'check'
-    await db.write()
-    if (!fs.existsSync(storage.path)) 
-      throw new Error('FolderNotFound:' + id)
-    if (fs.existsSync(storage.path + '\\bangumi.html'))
-      html = fs.readFileSync(storage.path + '\\bangumi.html', {encoding: 'utf-8'})
-    if (fs.existsSync(storage.path + '\\nyaa.md'))
-      md = fs.readFileSync(storage.path + '\\nyaa.md', {encoding: 'utf-8'})
-    if (fs.existsSync(storage.path + '\\acgrip.bbcode'))
-      bbcode = fs.readFileSync(storage.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
-    if (fs.existsSync(storage.path + '\\config.json')) {
-      let content: PublishConfig = JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-      title = content.title
-    }
-    return {html: html, md: md, bbcode: bbcode, title: title}
-  } catch (err) {
-    dialog.showErrorBox('错误', (err as Error).message)
-    return {}
-  }
-}
-
-//保存文件内容
-async function saveFileContent(_event, id: number, type: string, content: string, title: string) {
-  try{
-    let storage = db.data.posts.find(item => item.id == id)
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    if (!fs.existsSync(storage.path)) 
-      throw new Error('FolderNotFound:' + id)
-    if (type == 'html')
-      fs.writeFileSync(storage.path + '\\bangumi.html', content, {encoding: 'utf-8'})
-    if (type == 'md')
-      fs.writeFileSync(storage.path + '\\nyaa.md', content, {encoding: 'utf-8'})
-    if (type == 'bbcode')
-      fs.writeFileSync(storage.path + '\\acgrip.bbcode', content, {encoding: 'utf-8'})
-    let config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-    config.title = title
-    fs.writeFileSync(storage.path + '\\config.json', JSON.stringify(config))
-    return true
-  }
-  catch(err) {
-    dialog.showErrorBox('错误', (err as Error).message)
-    return false
-  }
-}
-
-async function exportContent(_event, id: number, type: string) {
-  let post = db.data.posts.find(item => item.id == id)!
-  const {canceled, filePath} = await dialog.showSaveDialog({defaultPath: post.name,filters: [{name: type, extensions: [type]}]})
-  if (canceled) return
-  let filename = ''
-  if (type == 'html') filename = '/bangumi.html'
-  if (type == 'md') filename = '/nyaa.md'
-  if (type == 'bbcode') filename = '/acgrip.bbcode'
-  fs.copyFileSync(post.path + filename, filePath)
-}
-
-//保存代理设置
-async function setProxyConfig(_event, config: string) {
-  let pconf = JSON.parse(config)
-  db.data.proxyConfig = pconf
-  await db.write()
-  app.relaunch()
-  app.exit()
-}
-
-//保存用户密码
-async function saveAccountInfo(_event, info: string) {
-  const result: Message_AccountInfo[] = JSON.parse(info)
-  for (let index = 0; index < 6; index++) {
-    db.data.cookies[index].username = result[index].username
-    db.data.cookies[index].password = result[index].password
-    db.data.cookies[index].enable = result[index].enable
-  }
-  await db.write()
-}
-
-//删除任务
-async function removeTask(_event, index: number) {
-  fs.rmSync(db.data.posts.find((item) => item.id == index)!.path, { recursive: true, force: true })
-  db.data.posts = db.data.posts.filter((item) => item.id != index)
-  db.write()
-  mainWindowWebContent.send('refreshTaskData')
-}
-
-//获取任务的发布情况
-async function getPublishInfo(_event, id: number) {
-  try{
-    let storage = db.data.posts.find(item => item.id == id)
-    let result: Message_PublishStatus[] = []
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    if (storage.bangumi) 
-      if (storage.bangumi == '种子已存在') 
-        result.push({site: 'bangumi', status: '种子已存在'})
-      else
-        result.push({site: 'bangumi', status: '发布完成'})
-    if (storage.nyaa) 
-      if (storage.nyaa == '种子已存在') 
-        result.push({site: 'nyaa', status: '种子已存在'})
-      else
-        result.push({site: 'nyaa', status: '发布完成'})
-    if (storage.acgrip) 
-      if (storage.acgrip == '种子已存在') 
-        result.push({site: 'acgrip', status: '种子已存在'})
-      else
-        result.push({site: 'acgrip', status: '发布完成'})
-    if (storage.dmhy) 
-      if (storage.dmhy == '种子已存在') 
-        result.push({site: 'dmhy', status: '种子已存在'})
-      else
-        result.push({site: 'dmhy', status: '发布完成'})
-    if (storage.acgnx_a) 
-      if (storage.acgnx_a == '种子已存在') 
-        result.push({site: 'acgnx_a', status: '种子已存在'})
-      else
-        result.push({site: 'acgnx_a', status: '发布完成'})
-    if (storage.acgnx_g) 
-      if (storage.acgnx_g == '种子已存在') 
-        result.push({site: 'acgnx_g', status: '种子已存在'})
-      else
-        result.push({site: 'acgnx_g', status: '发布完成'})
-    storage.step = 'publish'
-    await db.write()
-    return JSON.stringify(result)
-  }
-  catch(err){
-    dialog.showErrorBox('错误', (err as Error).message)
-    return []
-  }
-}
-
-//发布前检查登录情况
-async function checkAccount(_event, type: string) {
-  await checkLoginStatus(type)
-  let result = db.data.cookies.find((item) => item.name == type)!.status
-  return result
-}
-
-//主站发布获取信息
-async function getSiteInfo(_event, id: number) {
-  try {
-    let storage = db.data.posts.find(item => item.id == id)
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    if (!fs.existsSync(storage.path)) 
-      throw new Error('FolderNotFound:' + id)
-    const config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-    storage.step = 'site'
-    await db.write()
-    let result: string[] = []
-    //从文件创建
-    if (config.type == 'file') {
-      result.push('')
-      result.push('')
-      result.push('')
-      return result
-    }
-    //从模板创建
-    else {
-      let info = config.content as Content_text
-      let note = ''
-      if (info.note)
-        info.note.forEach(item => { note += item + ' + ' })
-      if (note != '')
-          note = note.slice(0, -2)
-      if (info.reseed)
-          note += `Reseed${info.rs_version > 1 ? ` v${info.rs_version}` : ''} Fin`
-      else
-          note += 'Fin'
-      let title = `${info.Name_En}${info.Name_Ch == '' ? '' : ' / ' +  info.Name_Ch} ${info.bit} ${info.resolution} ` 
-                + `${info.encoding} ${info.torrent_type} [${note}]`
-      result.push(title)
-      let team_Ch = '', content = ''
-      if (info.nomination)
-        content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。\n\n'
-      if (info.subTeam_Ch) {
-        info.subTeam_Ch.forEach(item => { team_Ch += item + ' & ' })
-      }
-      if (team_Ch != ''){
-        team_Ch = team_Ch.slice(0, -3)
-        content += `这个项目与 <strong>${team_Ch}</strong> 合作，感谢他们精心制作的字幕。\n\n`
-      }
-      content += info.comment_Ch + '\n\n'
-      if (info.sub_Ch && info.sub_Ch != '') {
-        content += info.sub_Ch + '\n'
-      }
-      if (info.audio_Ch && info.audio_Ch != '') {
-        content += info.audio_Ch + '\n'
-      }
-      if (content.slice(-2) != '\n\n') content += '\n'
-      if (info.nonsense && info.nonsense != '') {
-        content += info.nonsense + '\n\n'
-      }
-      content += '<!--more-->\n\n感谢所有参与制作者：\n'
-      content += `总监：${info.members.script}\n`
-      content += `压制：${info.members.encode}\n`
-      content += `整理：${info.members.collate}\n`
-      content += `发布：${info.members.upload}\n`
-      content += '分流：VCB-Studio CDN 分流成员\n\n'
-      if (info.reseed) {
-        content += '[box style="info"]\n重发修正：\n\n'
-        content += info.rs_comment_Ch + '\n[/box]\n\n'
-      }
-      content += '[box style="download"]\n'
-      content += `${info.bit} ${info.resolution} ${info.encoding}${info.reseed ? ' (Reseed)' : ''}`
-      content += '\n\n链接加载中[/box]\n\n'
-      if (info.reseed) 
-        content += '<hr />\n\n请将旧链放于此\n\n'
-      if (info.imageCredit != '') {
-        content += `Image Credit: <a href="${info.imageLinks}" rel="noopener" target="_blank">${info.imageCredit}</a>\n\n`
-      }
-      content += '<label for="medie-info-switch" class="btn btn-inverse-primary" title="展开MediaInfo">MediaInfo</label>\n\n'
-      content += '<pre class="js-medie-info-detail medie-info-detail" style="display: none">\n'
-      if (info.mediaInfo == '') 
-        content += '请将MediaInfo放置于此'
-      else 
-        content += info.mediaInfo
-      content += '\n</pre>'
-      result.push(content)
-      result.push(info.imageSrc!)
-      return result
-    }
-  }
-  catch (err) {
-    console.log(err)
-    dialog.showErrorBox('错误', (err as Error).message)
-    return []
-  }
-}
-//主站获取BT链接
-async function getBTLinks(_event, id: number) {
-  try {
-    let storage = db.data.posts.find(item => item.id == id)
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    if (!fs.existsSync(storage.path)) 
-      throw new Error('FolderNotFound:' + id)
-    storage.step = 'site'
-    await db.write()
-    let result: string[] = []
-    let isFinished = 'true'
-    //若bangumi团队同步未完成则再次尝试获取各站链接
-    if (storage.sync && 
-      !storage.acgrip && 
-      !storage.dmhy && 
-      !storage.acgnx_g && 
-      !storage.acgnx_a
-    ){
-      isFinished = 'false'
-      let response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/')[1]}, { responseType: 'json' })
-      for (let index = 0; index < 5; index++) {
-        if (response.status == 200 && response.data.sync){ 
-          isFinished = 'true'
-          storage.sync = false
-          break
-        }
-        await sleep(1000)
-        response = await axios.post('https://bangumi.moe/api/torrent/fetch', {_id: storage.bangumi!.split('torrent/ ')[1]}, { responseType: 'json' })
-      }
-      if (!storage.sync) 
-      {
-        if (response.data.sync.acgnx != '已存在相同的种子'){
-          storage.acgnx_a = response.data.sync.acgnx
-        }
-        else{
-          if (!storage.acgnx_a)
-            storage.acgnx_a = '种子已存在'
-        }
-        if (response.data.sync.acgnx_int != '已存在相同的种子'){
-          storage.acgnx_g = response.data.sync.acgnx_int
-        }
-        else{
-          if (!storage.acgnx_g)
-            storage.acgnx_g = '种子已存在'
-        }
-        if (response.data.sync.acgrip != '已存在相同的种子'){
-          storage.acgrip = response.data.sync.acgrip
-        }
-        else{
-          if (!storage.acgrip)
-            storage.acgrip = '种子已存在'
-        }
-        if (response.data.sync.dmhy != '已存在相同的种子'){
-          storage.dmhy = response.data.sync.dmhy
-        }
-        else{
-          if (!storage.dmhy)
-            storage.dmhy = '种子已存在'
-        }
-      }
-      await db.write()
-    }
-    //重新尝试获取动漫花园的链接
-    if (storage.dmhy == '未找到链接') {
-      isFinished = 'false'
-      const config: PublishConfig = await JSON.parse(fs.readFileSync(storage.path + '\\config.json', {encoding: 'utf-8'}))
-      let postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
-      let rtitle = config.title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
-      var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + rtitle)
-      let src = ''
-      for (let index = 0; index < 5; index++) {
-        let result = (postresult.data as string).match(rule)
-        if (result) {
-          src = result[1]
-          break
-        }
-        await sleep(1000)
-        postresult = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
-      }
-      if (src == '')
-        storage.dmhy = '未找到链接'
-      else {
-        storage.dmhy = 'https://www.dmhy.org' + src
-        isFinished = 'true'
-      }
-      await db.write()
-    }
-    result.push(storage.bangumi ? storage.bangumi : '')
-    result.push(storage.nyaa ? storage.nyaa : '')
-    result.push(storage.acgrip ? storage.acgrip : '')
-    result.push(storage.dmhy ? storage.dmhy : '')
-    result.push(storage.acgnx_g ? storage.acgnx_g : '')
-    result.push(storage.acgnx_a ? storage.acgnx_a : '')
-    result.push(isFinished)
-    return result
-  }
-  catch (err) {
-    console.log(err)
-    dialog.showErrorBox('错误', (err as Error).message)
-    return []
-  }
-}
-
-//获取主站发布链接
-async function getSiteSrc(_event, id: number) {
-  try {
-    let storage = db.data.posts.find(item => item.id == id)
-    if (storage == undefined) 
-      throw new Error('TaskNotFound:' + id)
-    if (!fs.existsSync(storage.path)) 
-      throw new Error('FolderNotFound:' + id)
-    storage.step = 'finish'
-    storage.status = 'published'
-    await db.write()
-    return storage.site ? storage.site : ''
-  }
-  catch (err){
-    console.log(err)
-    dialog.showErrorBox('错误', (err as Error).message)
-    return ''
-  }
-}
-
-//清除缓存
-async function clearStorage(_event) {
-  const partition = 'persist:login'
-  let ses = session.fromPartition(partition)
-  await ses.clearStorageData()
-  db.data.cookies.forEach((item) =>{
-    item.cookie = []
-  })
-  db.write()
-  mainWindowWebContent.send('refreshLoginData')
-}
-
-//写入剪切板
-function writeClipboard(_event, str: string) {
-  clipboard.writeText(str)
-}
-
-//主窗口
-let mainWindowWebContent: Electron.WebContents
+let mainWindowWebContent: Electron.WebContents //暴露主窗口上下文，用于刷新页面
 function createWindow(): void {
   
-  const partition = 'persist:main'
+  const partition = 'persist:main' //隔离窗口缓存
 
   const mainWindow = new BrowserWindow({
     width: 1150,
@@ -2109,17 +265,22 @@ function createWindow(): void {
     else if (details.url.includes('share.acgnx.se')) type = 'acgnx_a'
     else if (details.url.includes('www.acgnx.se')) type = 'acgnx_g'
     else {
-      callback({ requestHeaders: details.requestHeaders})
+      callback({ requestHeaders: details.requestHeaders })
       return
     }
-    const info = db.data.cookies.find(item => item.name == type) as LoginInfo
+    const info = userDB.data.info.find(item => item.name == type) as Config.LoginInfo
     let str = ''
-    info.cookie.forEach(item => {
+    info.cookies.forEach(item => {
       str += `${item.name}=${item.value}; `
     })
     details.requestHeaders['Cookie'] = str
     details.requestHeaders['User-Agent'] = userAgent
     callback({ requestHeaders: details.requestHeaders })
+  })
+  //设置代理
+  let pconf = userDB.data.proxyConfig
+  session.defaultSession.setProxy({ 
+    proxyRules: `${pconf.type}://${pconf.host}:${pconf.port}` 
   })
 
   //监听程序崩溃
@@ -2129,7 +290,8 @@ function createWindow(): void {
   })
 
   //窗口控制
-  ipcMain.on("WinHandle", (_event, command: string) => {
+  ipcMain.on("global_winHandle", (_event, message: string) => {
+    let { command } = JSON.parse(message) as Message.Global.WinHandle
     if (command == "close") {
       mainWindow.close() 
     }
@@ -2145,25 +307,23 @@ function createWindow(): void {
       }
     }
   })
-  ipcMain.on('openLoginWindow', (_event, type: string) => {
-    createLoginWindow(type)
-  })
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
   })
 
+  //使用系统默认应用打开外部链接
   mainWindow.webContents.on('will-navigate', (e, url) => {
     e.preventDefault()
     shell.openExternal(url)
-})
-
+  })
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
-  mainWindow.on('close', (_event) => {app.quit()})
+  //主窗口关闭时同时关闭应用
+  mainWindow.on('close', _event => app.exit())
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
@@ -2174,49 +334,2422 @@ function createWindow(): void {
   }
 }
 
+/*
+  登录窗口设置
+*/
+
+async function createLoginWindow(type: string) {
+
+  let url:string
+  if (type == 'bangumi') url = 'https://bangumi.moe'
+  else if (type == 'nyaa') url = 'https://nyaa.si/login'
+  else if (type == 'acgrip') url = 'https://acg.rip/users/sign_in'
+  else if (type == 'dmhy') url = 'https://www.dmhy.org/user'
+  else if (type == 'acgnx_g') url = 'https://www.acgnx.se/user.php?o=login'
+  else url = 'https://share.acgnx.se/user.php?o=login'
+
+  const partition = 'persist:login' //隔离窗口缓存
+  let ses = session.fromPartition(partition)
+
+  //获取并保存cookie信息
+  async function setCookies(type: string, url: string) {
+    await ses.cookies.get({url: url}).then((cookies) => {
+      userDB.data.info.find(item => item.name == type)!.cookies = cookies
+    }).catch(err => {console.log(err)})
+    //单独处理末日动漫的cloudflare验证
+    if (type.includes('acgnx'))
+      await ses.cookies.get({name: 'cf_clearance'}).then((cookies) => {
+        userDB.data.info.find(item => item.name == type)!.cookies.push(...cookies)
+      }).catch(err => {console.log(err)})
+    await userDB.write()
+  }
+
+  const loginWindow = new BrowserWindow({
+    width: 1200,
+    minWidth: 950,
+    minHeight: 750,
+    height: 600,
+    autoHideMenuBar: true,
+    show: false,
+    icon: appIcon,
+    webPreferences: {
+      partition: partition
+    },
+  })
+
+  loginWindow.on('ready-to-show', async () => {
+    loginWindow.show()
+  })
+  
+  loginWindow.on('close', async (e) => {
+    try{
+      e.preventDefault()
+      //保存cookie并检查登录状态
+      await setCookies(type, url)
+      await BT.checkLoginStatus(JSON.stringify({type}))
+      //告知页面刷新数据
+      mainWindowWebContent.send('BT_refreshLoginData')
+    }
+    catch(err){
+      console.log(err)
+    }
+    finally{
+      loginWindow.destroy()
+    }
+  })
+
+  //拦截设置useragent
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    details.requestHeaders['User-Agent'] = userAgent
+    callback({ requestHeaders: details.requestHeaders })
+  })
+  //配置代理
+  let pconf = userDB.data.proxyConfig
+  if (pconf.status) {
+    await loginWindow.webContents.session.setProxy({ 
+      proxyRules: `${pconf.type}://${pconf.host}:${pconf.port}` 
+    });
+  }
+
+  loginWindow.loadURL(url)
+}
+
+/*
+  部分全局设置，主要为App.vue和多组件共用的部分函数
+*/
+
+namespace Global {
+
+  //保存代理设置
+  export async function setProxyConfig(message: string) {
+    let pconf: Message.Global.ProxyConfig = JSON.parse(message)
+    userDB.data.proxyConfig = pconf
+    await userDB.write()
+    app.relaunch()
+    app.exit()
+  }
+  //获取代理设置
+  export function getProxyConfig() {
+    let msg: Message.Global.ProxyConfig = userDB.data.proxyConfig
+    return JSON.stringify(msg)
+  }
+
+  //打开文件并返回文件路径
+  export async function getFilePath(msg: string) {
+    let { type }: Message.Global.FileType = JSON.parse(msg)
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties:[ 'openFile' ],
+      filters: [{name: type, extensions:[type]}]
+    })
+    if (canceled) return ''
+    let result: Message.Global.Path = { path: filePaths[0] }
+    return JSON.stringify(result)
+  }
+  //打开文件夹并返回路径
+  export async function getFolderPath() {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties:[ 'openDirectory' ]
+    })
+    if (canceled) return ''
+    let result: Message.Global.Path = { path: filePaths[0] }
+    return JSON.stringify(result)
+  }
+  //打开目录
+  export async function openFolder(msg: string){
+    let { path }: Message.Global.Path = JSON.parse(msg)
+    shell.openPath(path)
+  }
+  
+  //写入剪切板
+  export function writeClipboard(msg: string) {
+    let { str }: Message.Global.Clipboard = JSON.parse(msg)
+    clipboard.writeText(str)
+  }
+
+  //读取文件内容
+  export async function readFileContent() {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties:[ 'openFile' ]
+    })
+    let content = ''
+    if (canceled) content = '' 
+    else content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
+    let result: Message.Global.FileContent = { content }
+    return JSON.stringify(result)
+  }
+
+  //格式转换
+  export function html2markdown (msg: string) {
+    let { content }: Message.Global.FileContent = JSON.parse(msg)
+    let converter = new html2md()
+    content = converter.turndown(content)
+    let result: Message.Global.FileContent = { content }
+    return JSON.stringify(result)
+  } 
+  export function html2bbcode (msg: string) {
+    let { content }: Message.Global.FileContent = JSON.parse(msg)
+    let converter = new html2md()
+    let md = converter.turndown(content)
+    let reader = new commonmark.Parser()
+    let writer = new md2bbc.BBCodeRenderer()
+    let parsed = reader.parse(md.replaceAll('\n* * *', ''))
+    let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
+    let result: Message.Global.FileContent = { content: bbcode }
+    return JSON.stringify(result)
+  }
+}
+
+/* 
+BT站功能相关
+*/
+
+namespace BT {
+
+  //获取登录窗口回话
+  export let ses: Session
+
+  //判断登录状态，若未登录尝试自动登录或唤起验证码对话框
+  export async function checkLoginStatus(msg: string) {
+    try {
+      let { type }: Message.BT.AccountType = JSON.parse(msg)
+      if (type == 'all') {
+        checkLoginStatus('{"type":"bangumi"}')
+        checkLoginStatus('{"type":"nyaa"}')
+        checkLoginStatus('{"type":"dmhy"}')
+        checkLoginStatus('{"type":"acgrip"}')
+        checkLoginStatus('{"type":"acgnx_a"}')
+        checkLoginStatus('{"type":"acgnx_g"}')
+        return ''
+      }
+      else {
+        let info: Config.LoginInfo = userDB.data.info.find(item => item.name === type)!
+        if (!info.enable) {
+          info.time = getCurrentTime()
+          info.status = '账户已禁用'
+          await userDB.write()
+          mainWindowWebContent.send('BT_refreshLoginData')
+        } 
+        else {
+          if (type == 'bangumi') {
+            await checkBangumiLoginStatus(info)
+            await userDB.write()
+            mainWindowWebContent.send('BT_refreshLoginData')
+            if (info.status == '账号未登录')
+              loginBangumi(info)
+          }
+          if (type == 'acgrip') {
+            await checkAcgripLoginStatus(info)
+            await userDB.write()
+            mainWindowWebContent.send('BT_refreshLoginData')
+            if (info.status == '账号未登录')
+              loginAcgrip(info)
+          }
+          if (type == 'nyaa') {
+            await checkNyaaLoginStatus(info)
+            await userDB.write()
+            mainWindowWebContent.send('BT_refreshLoginData')
+            if (info.status == '账号未登录'){
+              let msg: Message.BT.ReCaptchaType = { type: 'nyaa'}
+              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+            }
+          }
+          if (type == 'acgnx_a') {
+            await checkAcgnxALoginStatus(info)
+            await userDB.write()
+            mainWindowWebContent.send('BT_refreshLoginData')
+            if (info.status == '账号未登录'){
+              let msg: Message.BT.ReCaptchaType = { type: 'acgnx_a'}
+              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+            }
+          }
+          if (type == 'acgnx_g') {
+            await checkAcgnxGLoginStatus(info)
+            await userDB.write()
+            mainWindowWebContent.send('BT_refreshLoginData')
+            if (info.status == '账号未登录'){
+              let msg: Message.BT.ReCaptchaType = { type: 'acgnx_g'}
+              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+            }
+          }
+          if (type == 'dmhy') {
+            await checkDmhyLoginStatus(info)
+            await userDB.write()
+            mainWindowWebContent.send('BT_refreshLoginData')
+            if (info.status == '账号未登录'){
+              const result = await axios.get('https://www.dmhy.org/common/generate-captcha?code=' + Date.now())
+              //设置PHP_SESSION以保证验证码合法
+              if (result.headers['set-cookie']) {
+                result.headers['set-cookie']!.forEach(async item => {
+                  let cookie = item.split(';')[0]
+                  let index = cookie.indexOf('=')
+                  let name = cookie.slice(0, index)
+                  let value = cookie.slice(index + 1, cookie.length)
+                  await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+                });
+                await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
+                  info.cookies.push(...cookies)
+                }).catch(err => {console.log(err)})
+                userDB.write()
+              }
+              mainWindowWebContent.send('BT_loadIamgeCaptcha')
+            }
+          }
+        }
+        let msg: Message.BT.LoginStatus = {status: info.status}
+        return JSON.stringify(msg)
+      }
+    }
+    catch (err) {
+      console.log(err)
+      dialog.showErrorBox('错误', (err as Error).message)
+      return ''
+    }
+  }
+  async function checkBangumiLoginStatus(info: Config.LoginInfo) {
+    try {
+      const url = 'https://bangumi.moe/api/team/myteam'
+      let response = await axios.get(url, { responseType: 'text' })
+      for (let i = 0;i < 5;i++) {
+        if (response.status === 200) {
+          break
+        }
+        response = await axios.get(url, { responseType: 'text' })
+      }
+      const {data, status} = response
+      if (status != 200) {
+        throw response
+      }
+      if (data == '[]') {
+        info.time = getCurrentTime()
+        info.status = '账号未登录'
+      }
+      else {
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      info.time = getCurrentTime()
+    }
+  }
+  async function checkNyaaLoginStatus(info: Config.LoginInfo) {
+    try {
+      const url = 'https://nyaa.si/profile'
+      let response = await axios.get(url, { responseType: 'text' })
+      for (let i = 0;i < 5;i++) {
+        if (response.status === 200 || response.status === 302) {
+          break
+        }
+        response = await axios.get(url, { responseType: 'text' })
+      }
+      const {status} = response
+      if (status == 302) {
+        info.time = getCurrentTime()
+        info.status = '账号未登录'
+      }
+      else if (status == 200) {
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+      info.time = getCurrentTime()
+    }
+  }
+  async function checkAcgripLoginStatus(info: Config.LoginInfo) {
+    try {
+      const url = 'https://acg.rip/cp'
+      let response = await axios.get(url, { responseType: 'text' })
+      for (let i = 0;i < 5;i++) {
+        if (response.status === 200 || response.status === 302) {
+          break
+        }
+        response = await axios.get(url, { responseType: 'text' })
+      }
+      const {status} = response
+      if (status == 302) {
+        info.time = getCurrentTime()
+        info.status = '账号未登录'
+      }
+      else if (status == 200) {
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+      info.time = getCurrentTime()
+    }
+  }
+  async function checkDmhyLoginStatus(info: Config.LoginInfo) {
+    try {
+      const url = 'https://www.dmhy.org/user'
+      let response = await axios.get(url, { responseType: 'text' })
+      for (let i = 0;i < 5;i++) {
+        if (response.status === 200 || response.status === 302) {
+          break
+        }
+        response = await axios.get(url, { responseType: 'text' })
+      }
+      const {status} = response
+      if (status == 302) {
+        info.time = getCurrentTime()
+        info.status = '账号未登录'
+      }
+      else if (status == 200) {
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+      info.time = getCurrentTime()
+    }
+  }
+  async function checkAcgnxGLoginStatus(info: Config.LoginInfo) {
+    try {
+      const url = 'https://www.acgnx.se/user.php'
+      let response = await axios.get(url, { responseType: 'text' })
+      for (let i = 0;i < 5;i++) {
+        if (response.status === 200 || response.status === 302 || response.status === 403) {
+          break
+        }
+        response = await axios.get(url, { responseType: 'text' })
+      }
+      const {data, status} = response
+      if (status == 302) {
+        info.time = getCurrentTime()
+        info.status = '账号未登录'
+      }
+      else if (status == 403) {
+        info.time = getCurrentTime()
+        info.status = '防火墙阻止'
+        createLoginWindow('acgnx_g')
+      }
+      else if (status == 200) {
+        if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
+          info.time = getCurrentTime()
+          info.status = '防火墙阻止'
+          createLoginWindow('acgnx_g')
+        }
+        else {
+          info.time = getCurrentTime()
+          info.status = '账号已登录'
+        }
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+      info.time = getCurrentTime()
+    }
+  }
+  async function checkAcgnxALoginStatus(info: Config.LoginInfo) {
+    try {
+      const url = 'https://share.acgnx.se/user.php'
+      let response = await axios.get(url, { responseType: 'text' })
+      for (let i = 0;i < 5;i++) {
+        if (response.status === 200 || response.status === 302 || response.status === 403) {
+          break
+        }
+        response = await axios.get(url, { responseType: 'text' })
+      }
+      const {data, status} = response
+      if (status == 302) {
+        info.time = getCurrentTime()
+        info.status = '账号未登录'
+      }
+      else if (status == 403) {
+        info.time = getCurrentTime()
+        info.status = '防火墙阻止'
+        createLoginWindow('acgnx_a')
+      }
+      else if (status == 200) {
+        if ((data as string).includes('Your request has been blocked, Please complete the captcha to access.')) {
+          info.time = getCurrentTime()
+          info.status = '防火墙阻止'
+        createLoginWindow('acgnx_a')
+        }
+        else {
+          info.time = getCurrentTime()
+          info.status = '账号已登录'
+        }
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+      info.time = getCurrentTime()
+    }
+  }
+
+  //登录BT账户
+  export async function loginAccount(msg: string) {
+    let {type, key}: Message.BT.Captcha = JSON.parse(msg)
+    let info = userDB.data.info.find(item => item.name == type)!
+    if (type == 'nyaa')
+      loginNyaa(info, key)
+    if (type == 'acgnx_a')
+      loginAcgnxA(info, key)
+    if (type == 'acgnx_g')
+      loginAcgnxG(info, key)
+    if (type == 'dmhy')
+      loginDmhy(info, key)
+  }
+  async function loginBangumi(info: Config.LoginInfo) {
+    try {
+      info.time = getCurrentTime()
+      info.status = '正在登录'
+      await userDB.write()
+      mainWindowWebContent.send('BT_refreshLoginData')
+      const url = 'https://bangumi.moe/api/user/signin'
+      let uname = info.username
+      let pwd = info.password
+      let response = await axios.post(url, {username: uname, password: CryptoJS.MD5(pwd).toString()})
+      if (response.data.success) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://bangumi.moe', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+        });
+        await ses.cookies.get({url: 'https://bangumi.moe'}).then((cookies) => {
+          info.cookies.push(...cookies)
+        }).catch(err => {console.log(err)})
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else {
+        info.time = getCurrentTime()
+        info.status = '账号密码错误'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+    }
+    catch (err) {
+      console.log(err)
+    }
+  }
+  async function loginAcgrip(info: Config.LoginInfo) {
+    try {
+      info.time = getCurrentTime()
+      info.status = '正在登录'
+      await userDB.write()
+      mainWindowWebContent.send('BT_refreshLoginData')
+      const url = 'https://acg.rip/users/sign_in'
+      const formData = new FormData()
+      //CSRF验证
+      const csrf = await axios.get(url, { responseType: 'text' })
+      let cookievalue = csrf.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
+      let _kanako_session = info.cookies.find((item => item.name == '_kanako_session'))
+      if (_kanako_session)
+        _kanako_session.value = cookievalue
+      else 
+        info.cookies.push({name: '_kanako_session', value: cookievalue, sameSite: 'lax'})
+      await userDB.write()
+      const token = (csrf.data as string).match(/name="csrf-token"\scontent="([\S]*?)"/)![1]
+      formData.append('authenticity_token', token)
+      let uname = info.username
+      let pwd = info.password
+      formData.append('user[email]', uname)
+      formData.append('user[password]', pwd)
+      formData.append('user[remember_me]', '1')
+      formData.append('commit', '登录')
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://acg.rip', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+        });
+        await ses.cookies.get({url: 'https://acg.rip'}).then((cookies) => {
+          info.cookies.push(...cookies)
+        }).catch(err => {console.log(err)})
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+    }
+    catch (err) {
+      console.log(err)
+    }
+  }
+  async function loginNyaa(info: Config.LoginInfo, key: string) {
+    try {
+      info.time = getCurrentTime()
+      info.status = '正在登录'
+      await userDB.write()
+      mainWindowWebContent.send('BT_refreshLoginData')
+      let url = 'https://nyaa.si/login'
+      const formData = new FormData()
+      let uname = info.username
+      let pwd = info.password
+      formData.append('username', uname)
+      formData.append('password', pwd)
+      formData.append('g-recaptcha-response', key)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://nyaa.si', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+        });
+        await ses.cookies.get({url: 'https://nyaa.si'}).then((cookies) => {
+          info.cookies.push(...cookies)
+        }).catch(err => {console.log(err)})
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else if ((response.data as string).includes('Incorrect username or password')) {
+        info.time = getCurrentTime()
+        info.status = '账号密码错误'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+    }
+  }
+  async function loginDmhy(info: Config.LoginInfo, key: string) {
+    try {
+      info.time = getCurrentTime()
+      info.status = '正在登录'
+      await userDB.write()
+      mainWindowWebContent.send('BT_refreshLoginData')
+      let url = 'https://www.dmhy.org/user/login'
+      let uname = info.username
+      let pwd = info.password
+      const formData = new FormData()
+      formData.append('goto', 'https://www.dmhy.org/')
+      formData.append('email', uname)
+      formData.append('password', pwd)
+      formData.append('login_node', '0')
+      formData.append('cookietime', '315360000')
+      formData.append('captcha_code', key)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if ((response.data as string).includes('登入成功')) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+        });
+        await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
+          info.cookies.push(...cookies)
+        }).catch(err => {console.log(err)})
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else if ((response.data as string).includes('帐户密码错误')) {
+        info.time = getCurrentTime()
+        info.status = '账号密码错误'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else if ((response.data as string).includes('验证码错误')) {
+        info.time = getCurrentTime()
+        info.status = '验证码错误'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+    }
+  }
+  async function loginAcgnxG(info: Config.LoginInfo, key: string) {
+    try {
+      info.time = getCurrentTime()
+      info.status = '正在登录'
+      await userDB.write()
+      mainWindowWebContent.send('BT_refreshLoginData')
+      let url = 'https://www.acgnx.se/user.php?o=login'
+      const formData = new FormData()
+      let uname = info.username
+      let pwd = info.password
+      formData.append('op', 'login')
+      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
+      formData.append('emailaddress', uname)
+      formData.append('password', pwd)
+      formData.append('cookietime', '315360000')
+      formData.append('g-recaptcha-response', key)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://www.acgnx.se', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+        });
+        await ses.cookies.get({url: 'https://www.acgnx.se'}).then((cookies) => {
+          info.cookies.push(...cookies)
+        }).catch(err => {console.log(err)})
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else if ((response.data as string).includes('登錄密碼不正確')) {
+        info.time = getCurrentTime()
+        info.status = '账号密码错误'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+    }
+  }
+  async function loginAcgnxA(info: Config.LoginInfo, key: string) {
+    try {
+      info.time = getCurrentTime()
+      info.status = '正在登录'
+      await userDB.write()
+      mainWindowWebContent.send('BT_refreshLoginData')
+      let url = 'https://share.acgnx.se/user.php?o=login'
+      const formData = new FormData()
+      let uname = info.username
+      let pwd = info.password
+      formData.append('op', 'login')
+      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
+      formData.append('emailaddress', uname)
+      formData.append('password', pwd)
+      formData.append('cookietime', '315360000')
+      formData.append('g-recaptcha-response', key)
+      let response = await axios.post(url, formData, { responseType: 'text' })
+      if (response.status == 302) {
+        response.headers['set-cookie']!.forEach(async item => {
+          let cookie = item.split(';')[0]
+          let index = cookie.indexOf('=')
+          let name = cookie.slice(0, index)
+          let value = cookie.slice(index + 1, cookie.length)
+          await ses.cookies.set({url: 'https://share.acgnx.se', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+        });
+        await ses.cookies.get({url: 'https://share.acgnx.se'}).then((cookies) => {
+          info.cookies.push(...cookies)
+        }).catch(err => {console.log(err)})
+        info.time = getCurrentTime()
+        info.status = '账号已登录'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else if ((response.data as string).includes('登錄密碼不正確')) {
+        info.time = getCurrentTime()
+        info.status = '账号密码错误'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
+      else {
+        throw response
+      }
+    }
+    catch (err) {
+      console.log(err)
+    }
+  }
+
+  //打开登录窗口
+  export async function openLoginWindow(msg: string) {
+    let { type }: Message.BT.AccountType = JSON.parse(msg)
+    createLoginWindow(type)
+  }
+  
+  //保存用户密码
+  export async function saveAccountInfo(msg: string) {
+    const result: Message.BT.AccountInfo = JSON.parse(msg)
+    let info = userDB.data.info.find(item => item.name == result.type)!
+    info.username = result.username
+    info.password = result.password
+    info.enable = result.enable
+    await userDB.write()
+  }
+
+  //获取登录信息
+  export async function getAccountInfo(msg: string) {
+    let { type }: Message.BT.AccountType = JSON.parse(msg)
+    let info = userDB.data.info.find(item => item.name == type)!
+    let result: Message.BT.AccountInfo = {
+      type: info.name,
+      time: info.time,
+      status: info.status,
+      username: info.username,
+      password: info.password,
+      enable: info.enable
+    }
+    return JSON.stringify(result)
+  }
+
+  //清除登录状态
+  export async function clearStorage() {
+    const partition = 'persist:login'
+    let ses = session.fromPartition(partition)
+    await ses.clearStorageData()
+    userDB.data.info.forEach((item) =>{
+      item.cookies = []
+    })
+    await userDB.write()
+    mainWindowWebContent.send('BT_refreshLoginData')
+  }
+
+  //导入导出Cookies
+  export async function exportCookies(msg: string) {
+    const { canceled, filePath } = await dialog.showSaveDialog({filters: [{name: 'JSON', extensions: ['json']}]})
+    if (canceled) return
+    let { type }: Message.BT.AccountInfo = JSON.parse(msg)
+    let info = userDB.data.info.find(item => item.name == type)!
+    fs.writeFileSync(filePath, JSON.stringify(info.cookies))
+  }
+  export async function importCookies(msg: string) {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'], 
+      filters: [{name: 'JSON', extensions: ['json']}]
+    })
+    if (canceled) return
+    let { type }: Message.BT.AccountInfo = JSON.parse(msg)
+    userDB.data.info.find(item => item.name == type)!.cookies = JSON.parse(fs.readFileSync(filePaths[0], {encoding: 'utf-8'}))
+    await userDB.write()
+  }
+
+  //BT发布
+  export async function publish(msg: string) {
+    try {
+      let result = ''
+      let { id, type }: Message.Task.ContentType = JSON.parse(msg)
+      let task = taskDB.data.tasks.find(item => item.id == id)!
+      const config: Config.PublishConfig = await JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+      if (type == 'bangumi_all')
+        result = await publishBangumi(task, config, true)
+      else if (type == 'bangumi')
+        result = await publishBangumi(task, config, false)
+      else if (type == 'nyaa')
+        result = await publishNyaa(task, config)
+      else if (type == 'dmhy')
+        result = await publishDmhy(task, config)
+      else if (type == 'acgnx_a')
+        result = await publishAcgnxA(task, config)
+      else if (type == 'acgnx_g')
+        result = await publishAcgnxG(task, config)
+      else if (type == 'acgrip')
+        result = await publishAcgrip(task, config)
+      else result = 'failed'
+      let message: Message.Task.Result = { result }
+      return JSON.stringify(message)
+    } catch (err) {
+      console.log(err)
+      let message: Message.Task.Result = { result: 'failed' }
+      return JSON.stringify(message)
+    }
+  }
+  async function publishBangumi(task: Config.Task, config: Config.PublishConfig, sync: boolean) {
+    try {
+      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      const formData = new FormData()
+      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
+      let team_id: string = team.data[0]._id
+      formData.append('category_tag_id', config.category_bangumi)
+      formData.append('title',  config.title)
+      formData.append('introduction', html)
+      formData.append('tag_ids', config.tags.map(item => item.value).toString())
+      formData.append('btskey', 'undefined')
+      formData.append('team_id', team_id)
+      if (sync) formData.append('teamsync', '1')
+      formData.append('file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
+      const response = await axios.post('https://bangumi.moe/api/torrent/add', formData, { responseType: 'json' })
+      if (response.status != 200) throw response
+      if (response.data.success === true) {
+        task.bangumi = 'https://bangumi.moe/torrent/' + response.data.torrent._id
+        if (sync) {
+          await getBangumiSyncLink(task, response.data.torrent._id)
+        }
+        await taskDB.write()
+        return 'success'
+      }
+      else if (response.data.success === false && (response.data.message as string).includes('torrent same as')) {
+        if (!task.bangumi) {
+          let id = (response.data.message as string).slice(16)
+          task.bangumi = 'https://bangumi.moe/torrent/' + id
+          await taskDB.write()
+        }
+        return 'exist'
+      }
+      else {
+        console.log(response)
+        return 'failed'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function publishNyaa(task: Config.Task, config: Config.PublishConfig) {
+    try {
+      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      let md = fs.readFileSync(task.path + '\\nyaa.md', {encoding: 'utf-8'})
+      const formData = new FormData()
+      formData.append('torrent_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
+      formData.append('display_name', config.title)
+      formData.append('category', config.category_nyaa)
+      formData.append('information', config.information)
+      if (config.completed) 
+        formData.append('is_complete', 'y')
+      if (config.remake) 
+        formData.append('is_remake', 'y')
+      formData.append('description', md)
+      const response = await axios.post('https://nyaa.si/upload', formData, { responseType: 'text' })
+      if ((response.data as string).includes('You should be redirected automatically to target URL')) {
+        task.nyaa = response.headers['location']
+        await taskDB.write()
+        return 'success'
+      }
+      else if((response.data as string).includes('This torrent already exists')) {
+        if (!task.nyaa) {
+          let id = (response.data as string).match(/This\storrent\salready\sexists\s\(#(\d+)\)/)![1]
+          task.nyaa = 'https://nyaa.si/view/' + id
+          await taskDB.write()
+        }
+        return 'exist'
+      }
+      else {
+        console.log(response)
+        return 'failed'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function publishDmhy(task: Config.Task, config: Config.PublishConfig) {
+    try {
+      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+      const formData = new FormData()
+      const team = await axios.get('https://www.dmhy.org/team/myteam', { responseType: 'text'})
+      let team_id = (team.data as string).match(/<tbody>[\s\S]*?<td>([\S]*?)<\/td>/)
+      if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
+        formData.append('sort_id', '31')
+      else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
+        formData.append('sort_id', '2')
+      else formData.append('sort_id', '1')
+      formData.append('team_id', team_id ? team_id[1] : '')
+      formData.append('bt_data_title', config.title)
+      let imgsrc = html.match(/<img[\s\S]*?src="([\S]*?)"/)![1]
+      formData.append('poster_url', imgsrc)
+      formData.append('bt_data_intro', html)
+      formData.append('tracker', '')
+      formData.append('MAX_FILE_SIZE', '2097152')
+      formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
+      formData.append('disable_download_seed_file', '0')
+      formData.append('emule_resource', '')
+      formData.append('synckey', '')
+      formData.append('submit', '提交')
+      const response = await axios.post('https://www.dmhy.org/topics/add', formData, { responseType: 'text' })
+      if (response.status != 200) throw response
+      if ((response.data as string).includes('種子已存在，請不要重複上傳')) {
+        if (!task.dmhy) {
+          let src = await getDmhyLink(config.title)
+          if (src == '')
+            task.dmhy = '未找到链接'
+          else 
+            task.dmhy = 'https://www.dmhy.org' + src
+          await taskDB.write()
+        }
+        return 'exist'
+      }
+      if ((response.data as string).includes('上傳成功')) {
+        let src = await getDmhyLink(config.title)
+        if (src == '')
+          task.dmhy = '未找到链接'
+        else 
+          task.dmhy = 'https://www.dmhy.org' + src
+        await taskDB.write()
+        return 'success'
+      }
+      else {
+        console.log(response)
+        return 'failed'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function publishAcgnxA(task: Config.Task, config: Config.PublishConfig) {
+    try {
+      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      const formData = new FormData()
+      formData.append('op', 'upload')
+      if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
+        formData.append('sort_id', '2')
+      else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
+        formData.append('sort_id', '1')
+      else formData.append('sort_id', '19')
+      formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
+      formData.append('title', config.title)
+      formData.append('intro', html)
+      formData.append('emule_resource', '')
+      formData.append('synckey', '')
+      formData.append('discuss_url', '')
+      formData.append('Anonymous_Post', '0')
+      formData.append('Team_Post', '1')
+      const response = await axios.post('https://share.acgnx.se/user.php?o=upload', formData, { responseType: 'text' })
+      if (response.status != 200) throw response
+      if ((response.data as string).includes('恭喜，資源發佈成功')) {
+        task.acgnx_a = 'https://share.acgnx.se/' + (response.data as string).match(/href="([\S]*?)">查看發佈的資源/)![1]
+        await taskDB.write()
+        return 'success'
+      }
+      if ((response.data as string).includes('閣下所要上載的Torrent檔案已存在')) {
+        if (!task.acgnx_a) {
+          let url = (response.data as string).match(/查看原資源詳情：<a\shref="([\S]*?)">/)![1]
+          task.acgnx_a = 'https://share.acgnx.se/' + url
+          await taskDB.write()
+        }
+        return 'exist'
+      }
+      else {
+        console.log(response)
+        return 'failed'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function publishAcgnxG(task: Config.Task, config: Config.PublishConfig) {
+    try {
+      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      const formData = new FormData()
+      formData.append('op', 'upload')
+      if (config.category_nyaa == '1_2') 
+        formData.append('sort_id', '2')
+      else if (config.category_nyaa == '1_3')
+        formData.append('sort_id', '4')
+      else if (config.category_nyaa == '1_4')
+        formData.append('sort_id', '3')
+      else if (config.category_nyaa == '4_1')
+        formData.append('sort_id', '14')
+      else if (config.category_nyaa == '4_2')
+        formData.append('sort_id', '16')
+      else formData.append('sort_id', '15')
+      formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
+      formData.append('title', config.title)
+      formData.append('intro', html)
+      formData.append('emule_resource', '')
+      formData.append('synckey', '')
+      formData.append('discuss_url', '')
+      formData.append('tos', '1')
+      formData.append('Anonymous_Post', '0')
+      formData.append('Team_Post', '1')
+      const response = await axios.post('https://www.acgnx.se/user.php?o=upload', formData, { responseType: 'text' })
+      if (response.status != 200) throw response
+      if ((response.data as string).includes('Congratulations, upload success')) {
+        task.acgnx_g = 'https://www.acgnx.se/' + (response.data as string).match(/href="([\S]*?)">View\sThis\sTorrent/)![1]
+        await taskDB.write()
+        return 'success'
+      }
+      if ((response.data as string).includes('The Torrent file you are going to upload is already there')) {
+        if (!task.acgnx_g) {
+          let url = (response.data as string).match(/View\soriginal\storrent\sdetails：<a\shref="([\S]*?)">/)![1]
+          task.acgnx_g = 'https://www.acgnx.se/' + url
+          await taskDB.write()
+        }
+        return 'exist'
+      }
+      else {
+        console.log(response)
+        return 'failed'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function publishAcgrip(task: Config.Task, config: Config.PublishConfig) {
+    try {
+      let bbcode = fs.readFileSync(task.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      const formData = new FormData()
+      let date = new Date()
+      //CSRF验证
+      const csrf = await axios.get('https://acg.rip/cp/posts/upload', { responseType: 'text' })
+      let cookievalue = csrf.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
+      userDB.data.info[2].cookies.find((item => item.name == '_kanako_session'))!.value = cookievalue
+      await userDB.write()
+      const token = (csrf.data as string).match(/name="csrf-token"\scontent="([\S]*?)"/)![1]
+      formData.append('authenticity_token', token)
+      if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
+        formData.append('post[category_id]', '5')
+      else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
+        formData.append('post[category_id]', '1')
+      else formData.append('post[category_id]', '9')
+      formData.append('year', date.getFullYear().toString())
+      formData.append('post[series_id]', '0')
+      formData.append('post[torrent]', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
+      formData.append('post[title]', config.title)
+      formData.append('post[post_as_team]', '1')
+      formData.append('post[content]', bbcode)
+      formData.append('commit', '发布')
+      const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text', maxRedirects: 1 })
+      if ((response.data as string).includes('种子发布成功')) { 
+        cookievalue = response.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
+        userDB.data.info[2].cookies.find((item => item.name == '_kanako_session'))!.value = cookievalue
+        await userDB.write()
+        let src = await getAcgripLink(config.title)
+        if (src == '')
+          task.acgrip = '未找到链接'
+        else
+          task.acgrip = 'https://acg.rip' + src
+        await taskDB.write()
+        return 'success'
+      }
+      if ((response.data as string).includes('已存在相同的种子')) {
+        if (!task.acgrip) {
+          let src = await getAcgripLink(config.title)
+          if (src == '')
+            task.acgrip = '未找到链接'
+          else
+            task.acgrip = 'https://acg.rip' + src
+          await taskDB.write()
+        }
+        return 'exist'
+      }
+      else {
+        console.log(response)
+        return 'failed'
+      }
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  //获取动漫花园链接
+  //dmhy发布后不会返回发布的链接，需要从管理页获取，但网站数据同步还有延迟
+  async function getDmhyLink(title: string) {
+    let ruleTitle = escapeHtml(title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]'))
+    var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + ruleTitle)
+    let src = ''
+    for (let index = 0; index < 5; index++) {
+      await sleep(1000)
+      let result = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+      let link = (result.data as string).match(rule)
+      if (link) {
+        src = link[1]
+        break
+      }
+    }
+    return src
+  }
+  //获取Acgrip的链接
+  async function getAcgripLink(title: string) {
+    let ruletitle = escapeHtml(title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]'))
+    let rule = new RegExp('href="([\\S]*?)">' + ruletitle)
+    let src = ''
+    for (let index = 0; index < 5; index++) {
+      let result = await axios.get('https://acg.rip/cp/team_posts', { responseType: 'text' })
+      let link = (result.data as string).match(rule)
+      if (link) {
+        src = link[1]
+        break
+      }
+      await sleep(1000)
+      let cookievalue = result.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
+      userDB.data.info[2].cookies.find((item => item.name == '_kanako_session'))!.value = cookievalue
+      await userDB.write()
+    }
+    return src
+  }
+  //获取萌番组同步链接
+  async function getBangumiSyncLink(task: Config.Task, _id: string) {
+    task.sync = true
+    let data: any
+    for (let index = 0; index < 5; index++) {
+      await sleep(1000)
+      let result = await axios.post('https://bangumi.moe/api/torrent/fetch', { _id }, { responseType: 'json' })
+      if (result.status == 200 && result.data.sync) { 
+        task.sync = false
+        data = result.data
+        await taskDB.write()
+        break
+      }
+    }
+    if (task.sync) return
+    if (data.sync.acgnx) {
+      if (data.sync.acgnx != '已存在相同的种子'){
+        task.acgnx_a = data.sync.acgnx
+      }
+      else{
+        if (!task.acgnx_a)
+          task.acgnx_a = '种子已存在'
+      }
+    }
+    if (data.sync.acgnx_int) {
+      if (data.sync.acgnx_int != '已存在相同的种子'){
+        task.acgnx_g = data.sync.acgnx_int
+      }
+      else{
+        if (!task.acgnx_g)
+          task.acgnx_g = '种子已存在'
+      }
+    }
+    if (data.sync.acgrip) {
+      if (data.sync.acgrip != '已存在相同的种子'){
+        task.acgrip = data.sync.acgrip
+      }
+      else{
+        if (!task.acgrip)
+          task.acgrip = '种子已存在'
+      }
+    }
+    if (data.sync.dmhy) {
+      if (data.sync.dmhy != '已存在相同的种子'){
+        task.dmhy = data.sync.dmhy
+      }
+      else{
+        if (!task.dmhy)
+          task.dmhy = '种子已存在'
+      }
+    }
+  }
+
+  //获取Bangumi标签建议
+  export async function getBangumiTags(msg: string) {
+    try{
+      let { query }: Message.BT.BangumiQuery = JSON.parse(msg)
+      const response = await axios.post('https://bangumi.moe/api/tag/suggest', { query })
+      let result: Message.BT.BangumiTags = { data: response.data, status: response.status } 
+      return  JSON.stringify(result)
+    }
+    catch(err){
+      log.error(err)
+      let result: Message.BT.BangumiTags = { data: {}, status: 0 } 
+      return  JSON.stringify(result)
+    }
+  }
+  export async function searchBangumiTags(msg: string) {
+    try{
+      let { query }: Message.BT.BangumiQuery = JSON.parse(msg)
+      const response = await axios.post('https://bangumi.moe/api/tag/search', {name: query, multi: true, keywords: true})
+      let result: Message.BT.BangumiTags = { data: response.data, status: response.status } 
+      return  JSON.stringify(result)
+    }
+    catch(err){
+      log.error(err)
+      let result: Message.BT.BangumiTags = { data: {}, status: 0 } 
+      return  JSON.stringify(result)
+    }
+  }
+  
+  //主站获取BT链接
+  export async function getBTLinks(msg: string) {
+    let { id }: Message.Task.TaskID = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    let isFinished = 'true'
+    //若bangumi团队同步未完成则再次尝试获取各站链接
+    if (task.sync) {
+      isFinished = 'false'
+      let _id = task.bangumi!.split('torrent/')[1]
+      await getBangumiSyncLink(task, _id)
+      await taskDB.write()
+      if (!task.sync) isFinished = 'true'
+    }
+    //重新尝试获取动漫花园的链接
+    if (task.dmhy == '未找到链接') {
+      isFinished = 'false'
+      const config: Config.PublishConfig = JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+      let src = await getDmhyLink(config.title)
+      if (src == '')
+        task.dmhy = '未找到链接'
+      else {
+        task.dmhy = 'https://www.dmhy.org' + src
+        isFinished = 'true'
+      }
+      await taskDB.write()
+    }
+    let result: Message.Task.PublishStatus = {
+      bangumi_all: isFinished,
+      bangumi: task.bangumi,
+      nyaa: task.nyaa,
+      dmhy: task.dmhy,
+      acgrip: task.acgrip,
+      acgnx_a: task.acgnx_a,
+      acgnx_g: task.acgnx_g
+    }
+    return JSON.stringify(result)
+  }
+
+  //获取已发布的种子列表
+  export async function getTorrentList() {
+    let loginInfo = userDB.data.info
+    let result: Message.BT.TorrentList = { list: [] }
+    if (loginInfo.find(item => item.name == 'bangumi')!.enable) {
+      let torrents = await getBangumiTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.bangumi = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            bangumi: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'nyaa')!.enable) {
+      let torrents = await getNyaaTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.nyaa = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            nyaa: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'acgrip')!.enable) {
+      let torrents = await getAcgripTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.acgrip = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            acgrip: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'dmhy')!.enable) {
+      let torrents = await getDmhyTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.dmhy = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            dmhy: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'acgnx_a')!.enable) {
+      let torrents = await getAcgnxTorrentList(false)
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.acgnx_a = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            acgnx_a: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'acgnx_g')!.enable) {
+      let torrents = await getAcgnxTorrentList(true)
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.acgnx_g = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            acgnx_g: item.detail
+          })
+      })
+    }
+    return JSON.stringify(result)
+  }
+  async function getBangumiTorrentList() {
+    try {
+      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
+      let team_id: string = team.data[0]._id
+      let response = await axios.get('https://bangumi.moe/api/torrent/team?team_id=' + team_id, { responseType: 'json' })
+      let result: {title: string, detail: Message.BT.TorrentDetail.BangumiDetail}[] = []
+      response.data.torrents.forEach(item => {
+        result.push({
+          title: item.title,
+          detail: {
+            id: item._id,
+            url: 'https://bangumi.moe/torrent/' + item._id,
+            is_loaded: true,
+            content: {
+              category_tag_id: item.category_tag_id,
+              tag_ids: item.tag_ids,
+              content: item.introduction
+            }
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getNyaaTorrentList() {
+    try {
+      let team = await axios.get('https://nyaa.si/profile', { responseType: 'text' })
+      let teamName = (team.data as string).match(/Profile\sof\s<strong\sclass="text-default">([\s\S]*?)<\/strong>/)![1]
+      let response = await axios.get('https://nyaa.si/user/' + teamName, { responseType: 'text' })
+      let torrents = (response.data as string).match(/<tr\s\S*?>[\s\S]*?<\/tr>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.NyaaDetail}[] = []
+      torrents.forEach(item => {
+        let substr = item.match(/<td\scolspan="2">[\s\S]*?<\/td>/g)![0]
+        let [, link, title] = substr.match(/<a\shref="(\S*?)"\stitle="([\s\S]*?)">/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail: {
+            id: link.slice(6),
+            url: 'https://nyaa.si' + link,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getAcgnxTorrentList(global: boolean) {
+    try {
+      let baseUrl = ''
+      if (global) baseUrl = 'https://www.acgnx.se/'
+      else baseUrl = 'https://share.acgnx.se/'
+      let response = await axios.get(baseUrl + 'user.php?o=data', { responseType: 'text' })
+      let torrents = (response.data as string).match(/<tr\sclass="alt[12]\stext_center">[\s\S]*?<\/tr>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.AcgnxDetail}[] = []
+      torrents.forEach(item => {
+        let [, link, title] = item.match(/<a\shref="(\S*?)"\starget="_blank">(?!<)([\s\S]*?)<\/a>/)!
+        let [, id] = item.match(/user.php\?o=data&act=edit&id=(\d+)&type=/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail: {
+            id,
+            url: baseUrl + link,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getDmhyTorrentList() {
+    try {
+      let response = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+      let torrents = (response.data as string).match(/<tr\sclass="">[\s\S]*?<\/tr>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.DmhyDetail}[] = []
+      torrents.forEach(item => {
+        let [, link, title] = item.match(/<a\shref="(\S*?)"\s+target="_blank">([\s\S]*?)<\/a>/)!
+        let [, id] = item.match(/"\/topics\/edit\/id\/(\d+)"/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail:{
+            id,
+            url: 'https://www.dmhy.org' + link,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getAcgripTorrentList() {
+    try {
+      let response = await axios.get('https://acg.rip/cp/posts', { responseType: 'text' })
+      let torrents = (response.data as string).match(/<div\sclass="list-group-item">[\s\S]*?<\/div>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.AcgripDetail}[] = []
+      torrents.forEach(item => {
+        let [, id, title] = item.match(/<a\shref="\/t\/(\d+)">([\s\S]*?)<\/a>/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail: {
+            id,
+            url: 'https://acg.rip/t/' + id,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+
+  //获取已发布种子详情
+  export async function getTorrentDetail(msg: string) {
+    let { type, id }: Message.BT.TorrentInfo = JSON.parse(msg)
+    let result
+    if (type == 'nyaa')
+      result = await getNyaaTorrentDetail(id)
+    if (type == 'acgrip')
+      result = await getAcgripTorrentDetail(id)
+    if (type == 'acgnx_a')
+      result = await getAcgnxTorrentDetail(false, id)
+    if (type == 'acgnx_g')
+      result = await getAcgnxTorrentDetail(true, id)
+    if (type == 'dmhy')
+      result = await getDmhyTorrentDetail(id)
+    return JSON.stringify(result)
+  }
+  async function getNyaaTorrentDetail(id: string) {
+    try {
+      let response = await axios.get(`https://nyaa.si/view/${id}/edit`, { responseType: 'text'})
+      let data: string = response.data
+      let result: Message.BT.TorrentDetail.NyaaContent
+      let content = data.match(/<textarea[\s\S]*?>([\s\S]*?)<\/textarea>/)![1]
+      let category = data.match(/<option\sselected\svalue="([\s\S]*?)">/)![1]
+      let information = data.match(/<input[\s\S]*?id="information"[\s\S]*?value="([\s\S]*?)"/)![1]
+      let remake = data.match(/<input[\s\S]*?id="is_remake"/)![0]
+      let is_remake = remake.includes('checked')
+      let complete = data.match(/<input[\s\S]*?id="is_complete"/)![0]
+      let is_complete = complete.includes('checked')
+      result = { content, category, information, is_complete, is_remake }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+  async function getAcgripTorrentDetail(id: string) {
+    try {
+      let response = await axios.get(`https://acg.rip/cp/posts/${id}/edit`, { responseType: 'text'})
+      let data: string = response.data
+      let category_id = data.match(/<select[\s\S]*?id="post_category_id">[\s\S]*?<option\sselected="selected"\svalue="(\d)">/)![1]
+      let content = data.match(/<textarea[\s\S]*?id="post_content">([\s\S]*?)<\/textarea>/)![1]
+      let series_id = data.match(/<select\sname="post\[series_id\]"[\s\S]*?<option\sselected="selected"\svalue="(\d+)">/)![1]
+      let team = data.match(/<input[\s\S]*?id="post_post_as_team"\s\/>/)![0]
+      let post_as_team = team.includes('checked="checked"') ? '1' : '0'
+      let result: Message.BT.TorrentDetail.AcgripContent = { category_id, content, series_id, post_as_team }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+  async function getAcgnxTorrentDetail(global: boolean, id: string) {
+    try {
+      let url = ''
+      if (global) url = `https://www.acgnx.se/user.php?o=data&act=edit&id=${id}&type=`
+      else url = `https://share.acgnx.se/user.php?o=data&act=edit&id=${id}&type=`
+      let response = await axios.get(url, { responseType: 'text'})
+      let data: string = response.data
+      let content = data.match(/<textarea\sid="intro"[\s\S]*?>([\s\S]*?)<\/textarea>/)![1]
+      let sort_id = data.match(/<select\sid="sort_id"[\s\S]*?<option\svalue="(\d+)"\sselected="selected">/)![1]
+      let synckey = data.match(/<input[\s\S]*?id="synckey"[\s\S]*?value="([\s\S]*?)"\s\/>/)![1]
+      let discuss_url = data.match(/<input[\s\S]*?id="discuss_url"[\s\S]*?value="([\s\S]*?)"\s\/>/)![1]
+      let team = data.match(/<input[\s\S]*?name="Team_Post"\svalue="1"[\s\S]*?\/>/)![0]
+      let team_post = team.includes('checked="checked"') ? '1' : '0'
+      let result: Message.BT.TorrentDetail.AcgnxContent = { content, sort_id, synckey, discuss_url, team_post }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+  async function getDmhyTorrentDetail(id: string) {
+    try {
+      let response = await axios.get(`https://www.dmhy.org/topics/edit/id/${id}`, { responseType: 'text'})
+      let data: string = response.data
+      let sort_id = data.match(/<select\sname="sort_id"\sid="sort_id">[\s\S]*?<option\svalue="(\d+)"\s\S*\sselected="selected">/)![1]
+      let content = data.match(/<input[\s\S]*?name="bt_data_intro"\svalue="([\s\S]*?)"/)![1]
+      let poster_url = data.match(/<input[\s\S]*?id="poster_url"\svalue="([\s\S]*?)"/)![1]
+      let synckey = data.match(/<input[\s\S]*?id="synckey"\svalue="([\s\S]*?)"/)![1]
+      let result: Message.BT.TorrentDetail.DmhyContent = { content, sort_id, poster_url, synckey }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+
+  //更新线上内容
+  export async function updateTorrent(msg: string) {
+    let { type, id, config, title }: Message.BT.UpdatedContent = JSON.parse(msg)
+    let result
+    if (type == 'bangumi') 
+      result = await updateBangumiTorrent(title, id, config as any)
+    if (type == 'nyaa')
+      result = await updateNyaaTorrent(title, id, config as any)
+    if (type == 'acgnx_a')
+      result = await updateAcgnxTorrent(false, title, id, config as any)
+    if (type == 'acgnx_g')
+      result = await updateAcgnxTorrent(true, title, id, config as any)
+    if (type == 'dmhy')
+      result = await updateDmhyTorrent(title, id, config as any)
+    if (type == 'acgrip')
+      result = await updateAcgripTorrent(title, id, config as any)
+    let message: Message.Task.Result = { result }
+    return JSON.stringify(message)
+  }
+  async function updateBangumiTorrent(title: string, id: string, config: Message.BT.TorrentDetail.BangumiContent) {
+    try {
+      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
+      let team_id: string = team.data[0]._id
+      let data = {
+        category_tag_id: config.category_tag_id,
+        introduction: config.content.replaceAll('\n', ''),
+        tag_ids: config.tag_ids,
+        btskey: '',
+        _id: id,
+        title,
+        team_id
+      }
+      const response = await axios.post('https://bangumi.moe/api/torrent/update', data, { responseType: 'json' })
+      if (response.status == 200 && response.data.success)
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateNyaaTorrent(title: string, id: string, config: Message.BT.TorrentDetail.NyaaContent) {
+    try {
+      const formData = new FormData()
+      formData.append('display_name', title)
+      formData.append('category', config.category)
+      formData.append('information', config.information)
+      formData.append('description', config.content)
+      if (config.is_complete)
+        formData.append('is_complete', 'y')
+      if (config.is_remake)
+        formData.append('is_remake', 'y')
+      formData.append('submit', 'Save Changes')
+      const response = await axios.post(`https://nyaa.si/view/${id}/edit`, formData, { responseType: 'text' })
+      if ((response.data as string).includes('You should be redirected automatically to target URL'))
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateAcgnxTorrent(global: boolean, title: string, id: string, config: Message.BT.TorrentDetail.AcgnxContent) {
+    try {
+      const formData = new FormData()
+      formData.append('op', 'edit')
+      formData.append('id', id)
+      formData.append('sort_id', config.sort_id)
+      formData.append('title', title)
+      formData.append('intro', config.content)
+      formData.append('emule_resource', '')
+      formData.append('synckey', config.synckey)
+      formData.append('discuss_url', config.discuss_url)
+      formData.append('Team_Post', config.team_post)
+      if (global) {
+        formData.append('url', 'https%3A%2F%2Fwww.acgnx.se%2Fuser.php%3Fo%3Ddata')
+        formData.append('tos', '1')
+      }
+      else formData.append('url', 'https%3A%2F%2Fshare.acgnx.se%2Fuser.php%3Fo%3Ddata')
+      let url = global ? 'https://www.acgnx.se/user.php?o=data&type=' : 'https://share.acgnx.se/user.php?o=data&type='
+      const response = await axios.post(url, formData, { responseType: 'text' })
+      if (global && (response.data as string).includes('Successful!'))
+        return 'success'
+      if (!global && (response.data as string).includes('操作成功'))
+        return 'success'
+      return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateDmhyTorrent(title: string, id: string, config: Message.BT.TorrentDetail.DmhyContent) {
+    try {
+      const formData = new FormData()
+      formData.append('sort_id', config.sort_id)
+      formData.append('bt_data_title', title)
+      formData.append('poster_url', config.poster_url)
+      formData.append('bt_data_intro', config.content)
+      formData.append('synckey', '')
+      formData.append('submit', '提交')
+      formData.append('bt_data_id', id)
+      const response = await axios.post(`https://www.dmhy.org/topics/edit/id/${id}`, formData, { responseType: 'text' })
+      if ((response.data as string).includes('修改成功'))
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateAcgripTorrent(title: string, id: string, config: Message.BT.TorrentDetail.AcgripContent) {
+    try {
+      const tokenPage = await axios.get(`https://acg.rip/cp/posts/${id}/edit`, { responseType: 'text' })
+      let token = (tokenPage.data as string).match(/name="authenticity_token"\svalue="([\s\S]*?)"/)![1]
+      const formData = new FormData()
+      formData.append('_method', 'patch')
+      formData.append('authenticity_token', token)
+      formData.append('post[category_id]', config.category_id)
+      formData.append('post[series_id]', config.series_id)
+      formData.append('post[title]', title)
+      formData.append('post[post_as_team]', config.post_as_team)
+      formData.append('post[content]', config.content)
+      formData.append('commit', '更新')
+      const response = await axios.post(`https://acg.rip/cp/posts/${id}`, formData, { responseType: 'text', maxRedirects: 1 })
+      if ((response.data as string).includes('种子发布成功'))
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+}
+
+/* 
+主站功能相关
+*/
+
+namespace Forum {
+
+  //获取主站账户信息
+  export function getAccountInfo() {
+    let info = userDB.data.forum
+    let msg: Message.Forum.AccountInfo = {
+      username: info.username,
+      password: info.password
+    }
+    return JSON.stringify(msg)
+  }
+  //保存主站账户信息
+  export async function saveAccountInfo(msg: string) {
+    let info: Message.Forum.AccountInfo = JSON.parse(msg)
+    userDB.data.forum.username = info.username
+    userDB.data.forum.password = info.password
+    await userDB.write()
+  }
+  
+  //RS搜索文章
+  export async function searchPosts(msg: string) {
+    let { title }: Message.Forum.Title = JSON.parse(msg)
+    let result: Message.Forum.Posts = { posts: [] }
+    const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?context=edit&search=' + title, { responseType: 'json' })
+    if (response.data.status == 401)
+      throw new Error('主站认证失败')
+    response.data.forEach(item => {
+      result.posts.push({
+        id: item.id,
+        title: item.title.rendered,
+        content: item.content.rendered.split('<!--more-->')[0],
+        raw: item.content.raw
+      })
+    })
+    return JSON.stringify(result)
+  }
+
+  //主站发布
+  export async function publish(msg: string) {
+    let message: Message.Task.Result = { result: ''}
+    try {
+      let config: Message.Forum.PublishConfig = JSON.parse(msg)
+      if (!fs.existsSync(config.imagePath)) {
+        message.result = 'noSuchFile_webp'
+        return JSON.stringify(message)
+      }
+      const img = fs.readFileSync(config.imagePath)
+      let imageData = new FormData()
+      imageData.append('file', new Blob([img]), config.imagePath.replace(/^.*[\\\/]/, ''))
+      const result = await axios.post('https://vcb-s.com/wp-json/wp/v2/media', imageData, { responseType: 'json' })
+      if (result.status == 401) {
+        message.result = 'unauthorized'
+        return JSON.stringify(message)
+      }
+      if (result.status != 201) throw result
+      let data = {
+        title: config.title,
+        content: config.content,
+        status: 'publish',
+        format: 'standard',
+        categories: JSON.parse(config.categories),
+        featured_media: result.data.id
+      }
+      const response = await axios.post('https://vcb-s.com/wp-json/wp/v2/posts', data, {responseType: 'json'})
+      if (response.status == 201) {
+        taskDB.data.tasks.find(item => item.id == config.id)!.forumLink = response.data.link
+        message.result = 'success'
+        return JSON.stringify(message)
+      }
+      if (response.status == 400) {
+        message.result = 'empty'
+        return JSON.stringify(message)
+
+      }
+      throw response
+    }
+    catch (err) {
+      console.log(err)
+      message.result = 'failed'
+      return JSON.stringify(message)
+    }
+  }
+  //RS主站发布
+  export async function rsPublish(msg: string) {
+    let message: Message.Task.Result = { result: ''}
+    try{
+      let config: Message.Forum.RSConfig = JSON.parse(msg)
+      let data = {
+        date: getNowFormatDate(),
+        title: config.title,
+        content: config.content,
+      }
+      const response = await axios.patch('https://vcb-s.com/wp-json/wp/v2/posts/' + config.rsID, data, {responseType: 'json'})
+      if (response.status == 200) {
+        taskDB.data.tasks.find((item) => item.id == config.id)!.forumLink = response.data.link
+        message.result = 'success'
+        return JSON.stringify(message)
+      }
+      if (response.status == 400) {
+        message.result = 'empty'
+        return JSON.stringify(message)
+      }
+      if (response.status == 401) {
+        message.result = 'unauthorized'
+        return JSON.stringify(message)
+      }
+      throw response
+    }
+    catch (err) {
+      console.log(err)
+      message.result = 'failed'
+      return JSON.stringify(message)
+    }
+  }
+}
+
+/* 
+任务相关处理
+*/
+
+namespace Task {
+
+  //创建新任务
+  export async function createTask(msg: string) {
+    try{
+      let { type, path, name }: Message.Task.TaskConfig = JSON.parse(msg)
+      if (path === "") {
+        path = app.getPath('userData') + '\\task'
+        if (!fs.existsSync(path))
+          fs.mkdirSync(path)
+      }
+      if (!fs.existsSync(path)) {
+        let result: Message.Task.Result = { result: 'noSuchFolder'}
+        return JSON.stringify(result)
+      }
+      else{
+        if (name == '')
+          name = getNowFormatDate().replace(/:/g, '-')
+        fs.mkdirSync(path + '\\' +  name)
+        let content
+        if (type == 'template') {
+          content = {
+            title_CN: '',
+            title_EN: '',
+            title_JP: '',
+            depth: '10-bit',
+            resolution: '1080p',
+            encoding: 'HEVC',
+            contentType: 'BDRip',
+            reseed: false,
+            nomination: false,
+            note: [],
+            comment_CN: '',
+            comment_EN: '',
+            rsVersion: 1,
+            members: {
+              script: '',
+              encode: '',
+              collate: '',
+              upload: ''
+            },
+            posterUrl: '',
+            prefill: false
+          }
+        }
+        else {
+          content = {
+            path_md: '',
+            path_html: '',
+            path_bbcode: '',
+          }
+        }
+        let config: Config.PublishConfig = {
+          title: '',
+          category_bangumi: '',
+          category_nyaa: '',
+          information: 'https://vcb-s.com/archives/138',
+          tags: [],
+          torrentName: '',
+          torrentPath: '',
+          content
+        }
+        fs.writeFileSync(path + '\\' +  name + '\\config.json', JSON.stringify(config))
+        let id = Date.now()
+        taskDB.data.tasks.push({
+          id: id,
+          type: type,
+          name: name,
+          path: path + '\\' + name,
+          status: 'publishing',
+          step: 'edit',
+          sync: false
+        })
+        await taskDB.write()
+        let result: Message.Task.Result = { result: 'success:' + id }
+        return JSON.stringify(result)
+      }
+    }
+    catch(err){
+      dialog.showErrorBox('错误', (err as Error).message)
+      let result: Message.Task.Result = { result: 'failed' }
+      return JSON.stringify(result)
+    }
+  }
+
+  //获取全部任务信息
+  export function getTaskList() {
+    let result: Message.Task.TaskList = { list: taskDB.data.tasks }
+    return JSON.stringify(result)
+  }
+  //获取任务类型
+  export function getTaskType(msg: string) {
+    let { id }: Message.Task.TaskID = JSON.parse(msg)
+    let type = taskDB.data.tasks.find(item => item.id == id)!.type
+    let result: Message.Task.TaskType = { type }
+    return JSON.stringify(result)
+  }
+
+  //删除任务
+  export async function removeTask(msg: string) {
+    let { id }: Message.Task.TaskID = JSON.parse(msg)
+    fs.rmSync(taskDB.data.tasks.find((item) => item.id == id)!.path, { recursive: true, force: true })
+    taskDB.data.tasks = taskDB.data.tasks.filter(item => item.id != id)
+    await taskDB.write()
+    mainWindowWebContent.send('task_refreshTaskData')
+  }
+
+  //获取主站发布链接
+  export async function getForumLink(msg: string) {
+    let { id }: Message.Task.TaskID = JSON.parse(msg)
+    let info = taskDB.data.tasks.find(item => item.id == id)!
+    let result: Message.Task.ForumLink = { link: info.forumLink }
+    return JSON.stringify(result)
+  }
+
+  //设置任务进度
+  export async function setTaskProcess(msg: string) {
+    let { id, step }: Message.Task.TaskStatus = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    task.step = step
+    if (step == 'finish') task.status = 'published'
+    await taskDB.write()
+  }
+
+  //复查任务
+  export async function getContent(msg: string) {
+    let { id }: Message.Task.TaskID = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    let html = '', md = '', bbcode = '', title = ''
+    html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+    md = fs.readFileSync(task.path + '\\nyaa.md', {encoding: 'utf-8'})
+    bbcode = fs.readFileSync(task.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
+    let content: Config.PublishConfig = JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+    title = content.title
+    let result: Message.Task.TaskContents = { html, md, bbcode, title }
+    return JSON.stringify(result)
+  }
+  //保存内容修改
+  export async function saveContent(msg: string) {
+    let { id, content, type }: Message.Task.ModifiedContent = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    if (type == 'html')
+      fs.writeFileSync(task.path + '\\bangumi.html', content, {encoding: 'utf-8'})
+    if (type == 'md')
+      fs.writeFileSync(task.path + '\\nyaa.md', content, {encoding: 'utf-8'})
+    if (type == 'bbcode')
+      fs.writeFileSync(task.path + '\\acgrip.bbcode', content, {encoding: 'utf-8'})
+  }
+  //保存标题修改
+  export async function saveTitle(msg: string) {
+    let { id, title }: Message.Task.ModifiedTitle = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    let path = task.path + '\\config.json'
+    let config: Config.PublishConfig = JSON.parse(fs.readFileSync(path, {encoding: 'utf-8'}))
+    config.title = title
+    fs.writeFileSync(path, JSON.stringify(config), {encoding: 'utf-8'})
+  }
+  //导出发布稿
+  export async function exportContent(msg: string) {
+    let { id, type }: Message.Task.ContentType = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    const {canceled, filePath} = await dialog.showSaveDialog({defaultPath: task.name,filters: [{name: type, extensions: [type]}]})
+    if (canceled) return
+    let filename = ''
+    if (type == 'html') filename = '/bangumi.html'
+    if (type == 'md') filename = '/nyaa.md'
+    if (type == 'bbcode') filename = '/acgrip.bbcode'
+    fs.copyFileSync(task.path + filename, filePath)
+  }
+
+  //获取任务的发布情况
+  export async function getPublishStatus(msg: string) {
+    let { id }: Message.Task.TaskID = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    let result: Message.Task.PublishStatus = {}
+    if (task.bangumi && task.bangumi != '种子已存在') {
+      result.bangumi = '发布完成'
+      result.bangumi_all
+    }
+    if (task.nyaa && task.nyaa != '种子已存在') result.nyaa = '发布完成'
+    if (task.dmhy && task.dmhy != '种子已存在') result.dmhy = '发布完成'
+    if (task.acgrip && task.acgrip != '种子已存在') result.acgrip = '发布完成'
+    if (task.acgnx_a && task.acgnx_a != '种子已存在') result.acgnx_a = '发布完成'
+    if (task.acgnx_g && task.acgnx_g != '种子已存在') result.acgnx_g = '发布完成'
+    return JSON.stringify(result)
+  }
+
+  //编辑任务时获取任务信息
+  export async function getPublishConfig(msg: string) {
+    try{
+      let { id }: Message.Task.TaskID = JSON.parse(msg)
+      let task = taskDB.data.tasks.find(item => item.id == id)!
+      const config: Message.Task.PublishConfig = JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+      return JSON.stringify(config)
+    }
+    catch(err){
+      dialog.showErrorBox('错误', (err as Error).message)
+      return
+    }
+  }
+
+  //从url.txt加载对比图
+  export async function loadComparisons() {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties:[ 'openFile' ],
+      filters: [{name: 'txt', extensions:['txt']}]
+    })
+    if (canceled) return
+    let content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
+    let html = content.match(/<p>[\s\S]*<\/p>/)![0]
+    let md = content.match(/\[!\[\]\([\s\S]*\)\s\s/)![0]
+    let bbcode = content.match(/\[URL=[\s\S]*\[\/URL\]/)![0]
+    const str = 'Comparison (right click on the image and open it in a new tab to see the full-size one)\n'
+              + content.match(/<br\/>[\s\S]*?<br\/>/)![0].slice(5).slice(0, -5).trim() + '\n\n' 
+    html += '\n'
+    md = str + md
+    bbcode = str + bbcode + '\n'
+    bbcode = bbcode.replace(/IMG/g, 'img')
+    bbcode = bbcode.replace(/URL/g, 'url')
+    let msg: Message.Task.Comparisons = { html, md, bbcode }
+    return JSON.stringify(msg)
+  } 
+
+  //创建和保存
+  export async function createConfig(msg: string){
+    let { id, config, type }: Message.Task.ModifiedConfig = JSON.parse(msg)
+    let result = ''
+    if (type == 'template')
+      result = await createWithTemplate(id, config)
+    else 
+      result = await createWithFile(id, config)
+    let response: Message.Task.Result = { result }
+    return JSON.stringify(response)
+  }
+  async function createWithFile(id: number, config: Config.PublishConfig) {
+    try {
+      let task = taskDB.data.tasks.find(item => item.id == id)
+      let info = config.content as Config.Content_file
+      if (!task) return 'taskNotFound'
+      fs.writeFileSync(task.path + '\\config.json', JSON.stringify(config))
+      if (!fs.existsSync(config.torrentPath)) return "noSuchFile_torrent"
+      if (!fs.existsSync(info.path_html))
+        return "noSuchFile_html"
+      else 
+        fs.copyFileSync(info.path_html, task.path + '\\bangumi.html')
+      if (!fs.existsSync(info.path_md)) {
+        if (info.path_md != '') 
+          return 'noSuchFile_md'
+        let content = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+        var converter = new html2md()
+        let md = converter.turndown(content)
+        fs.writeFileSync(task.path + '\\nyaa.md', md)
+      } else
+        fs.copyFileSync(info.path_html, task.path + '\\bangumi.html')
+      if (!fs.existsSync(info.path_bbcode)) {
+        if (info.path_bbcode != '') 
+          return 'noSuchFile_bbcode'
+        let content = fs.readFileSync(task.path + '\\nyaa.md', {encoding: 'utf-8'})
+        let reader = new commonmark.Parser()
+        let writer = new md2bbc.BBCodeRenderer()
+        let parsed = reader.parse((content as string).replaceAll('\n* * *', ''))
+        let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
+        fs.writeFileSync(task.path + '\\acgrip.bbcode', bbcode)
+      } else
+        fs.copyFileSync(info.path_bbcode, task.path + '\\acgrip.bbcode')
+      fs.copyFileSync(config.torrentPath, task.path + '\\' + config.torrentPath.replace(/^.*[\\\/]/, ''))
+      return 'success'
+    } catch (err) {
+      dialog.showErrorBox('错误', (err as Error).message)
+      return 'failed'
+    }
+  }
+  async function createWithTemplate(id: number, config: Config.PublishConfig) {
+    try {
+      let task = taskDB.data.tasks.find(item => item.id == id)
+      let info = config.content as Config.Content_template
+      if (!task) return 'taskNotFound'
+      fs.writeFileSync(task.path + '\\config.json', JSON.stringify(config))
+      if (!fs.existsSync(config.torrentPath)) return "noSuchFile_torrent"
+      let content = '<p>\n'
+      content += `<img src="${info.posterUrl}" alt="${info.posterUrl.replace(/^.*[\\\/]/, '')}" /><br />\n<br />\n`
+      let note = ''
+      if (info.note)
+        info.note.forEach(item => { note += item + ' + ' })
+      if (note != '')
+        note = note.slice(0, -2)
+      let reseed = info.reseed ? ` Reseed${info.rsVersion > 1 ? ` v${info.rsVersion}` : ''}` : ''
+      if (config.title.includes(info.title_JP)) {
+        if (info.title_CN != '')
+          content += info.title_CN + ' / '
+        content += info.title_EN
+        if (info.title_JP != '')
+          content += ` / ${info.title_JP} `
+        content += ` ${note} ${info.contentType}${reseed} <br />\n`
+      }
+      else {
+        if (info.title_CN != '') 
+          content += `${info.title_CN} ${note} ${info.contentType}${reseed} <br />\n`
+        content += `${info.title_EN} ${note} ${info.contentType}${reseed} <br />\n`
+        if (info.title_JP != '') 
+          content += `${info.title_JP} ${note} ${info.contentType}${reseed} <br />\n`
+      }
+      content += '<br />\n'
+      if (info.sub_CN && info.sub_CN != '') {
+        content += `${info.sub_CN}<br />\n${info.sub_EN}<br />\n`
+      }
+      if (info.audio_CN && info.audio_CN != '') {
+        content += `${info.audio_CN}<br />\n${info.audio_EN}<br />\n`
+      }
+      if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
+      if (info.nomination) {
+        content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。<br />\n'
+        content += 'This project was <strong>nominated by our members</strong> and produced upon request. Thanks to them for their selfless dedication to the development of VCB-Studio.<br />\n<br />\n'
+      }
+      let team_CN = '', team_EN = ''
+      if (info.subTeam_CN && info.subTeam_EN) {
+        info.subTeam_CN.forEach(item => { team_CN += item + ' & ' })
+        info.subTeam_EN.forEach(item => { team_EN += item + ' & ' })
+      }
+      if (team_CN != ''){
+        team_CN = team_CN.slice(0, -3)
+        team_EN = team_EN.slice(0, -3)
+        content += `这个项目与 <strong>${team_CN}</strong> 合作，感谢他们精心制作的字幕。<br />\n`
+        content += `This project is in collaboration with <strong>${team_EN}</strong>. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
+      }
+      var p1=/([A-Za-z0-9_])([\u4e00-\u9fa5]+)/gi;
+      var p2=/([\u4e00-\u9fa5]+)([A-Za-z0-9_])/gi;
+      let comment_CN = info.comment_CN.replace(p1, "$1 $2").replace(p2, "$1 $2").split('\n')
+      let comment_EN = info.comment_EN.split('\n')
+      for (let i = 0; i <comment_CN.length; i++){
+        content += comment_CN[i] + '<br />\n'
+        content += comment_EN[i] + '<br />\n<br />\n'
+      }
+      if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
+      if (info.nonsense) {
+        let nonsense = info.nonsense.split('\n')
+        nonsense.forEach(item => {
+          content += item + '<br />\n'
+        });
+      }
+      if (content.slice(-14) != '<br />\n<br />\n') content += '<br />\n'
+      content += '</p>\n<hr />\n<p>\n'
+      if (info.reseed) {
+        let rsComment_CN = info.rsComment_CN!.split('\n')
+        let rsComment_EN = info.rsComment_EN!.split('\n')
+        content += '重发修正：<br />\n'
+        rsComment_CN.forEach(item => {
+          content += item + '<br />\n'
+        });
+        content += '<br />\nReseed comment:<br />\n'
+        rsComment_EN.forEach(item => {
+          content += item + '<br />\n'
+        });
+        content += '<br />\n</p>\n<hr />\n<p>\n'
+      }
+      content += '感谢所有参与制作者 / Thanks to our participating members:<br />\n'
+      content += '总监 / Script: ' + info.members.script + '<br />\n'
+      content += '压制 / Encode: ' + info.members.encode + '<br />\n'
+      content += '整理 / Collate: ' + info.members.collate + '<br />\n'
+      content += '发布 / Upload: ' + info.members.upload + '<br />\n'
+      content += '分流 / Seed: VCB-Studio CDN 分流成员<br />\n'
+      if (info.providers && info.providers != '') {
+        let providers = info.providers.split('\n')
+        content += '<br />\n感谢所有资源提供者 / Thanks to all resource providers:<br />\n'
+        providers.forEach(item => {
+          content += item + '<br />\n'
+        });
+      }
+      content += '<br />\n</p>\n<hr />\n<p>\n'
+      if (info.reseed) {
+        content += '本次发布来自 VCB-Studio 旧作重发计划。我们会不定期重发过去发布过的合集，或为补充做种，或为修正制作错漏，或为整合系列合集。<br />\n'
+        content += 'This is a release of VCB-Studio Reseed Project. We would re-upload previous torrents from time to time, to resurrect old torrents with few seeders, to correct errors/omissions, or to batch separate releases that belong to a same series.<br />\n'
+        content += '<br />\n</p>\n<hr />\n<p>\n'
+      }
+      if (!info.reseed) {
+        content += ' VCB-Studio 已不再保证收集作品相关 CD 和扫图资源，详情请参见 <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a>。<br />\n'
+        content += 'Please refer to <a href="https://vcb-s.com/archives/14331">https://vcb-s.com/archives/14331</a> on VCB-Studio no longer guaranteeing the inclusion of relevant CDs and scans.<br />\n<br />\n'
+        content += '本组（不）定期招募新成员。详情请参见 <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a>。<br />\n'
+        content += 'Please refer to <a href="https://vcb-s.com/archives/16986">https://vcb-s.com/archives/16986</a> for information on our (un)scheduled recruitment.<br />\n<br />\n'
+      }
+      content += '播放器教程索引： <a href="https://vcb-s.com/archives/16639" target="_blank">VCB-Studio 播放器推荐</a><br />\n'
+      content += '中文字幕分享区： <a href="https://bbs.acgrip.com/" target="_blank">Anime 分享论坛</a><br />\n'
+      content += '项目计划与列表： <a href="https://vcb-s.com/archives/138" target="_blank">VCB-Studio 项目列表</a><br />\n'
+      content += '特殊格式与说明： <a href="https://vcb-s.com/archives/7949" target="_blank">WebP 扫图说明</a><br />\n<br />\n</p>\n'
+      if (!info.reseed) {
+        content += '<hr />\n'
+      }
+      let converter = new html2md()
+      let md = converter.turndown(content)
+      let reader = new commonmark.Parser()
+      let bbcodeWriter = new md2bbc.BBCodeRenderer()
+      let parsed_bbcode = reader.parse((md as string).replaceAll('\n* * *', ''))
+      let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
+      let html = content
+      if (!info.reseed) {
+        md += '\n\n' +  info.comparisons_md
+        html += info.comparisons_html
+        info.comparisons_bbcode = info.comparisons_bbcode!.replace(/IMG/g, 'img')
+        info.comparisons_bbcode = info.comparisons_bbcode!.replace(/URL/g, 'url')
+        bbcode += '\n' + info.comparisons_bbcode
+      }
+      fs.writeFileSync(task.path + '\\bangumi.html', html)
+      fs.writeFileSync(task.path + '\\nyaa.md', md)
+      fs.writeFileSync(task.path + '\\acgrip.bbcode', bbcode)
+      fs.copyFileSync(config.torrentPath, task.path + '\\' + config.torrentPath.replace(/^.*[\\\/]/, ''))
+      return 'success'
+    } catch (err) {
+      dialog.showErrorBox('错误', (err as Error).message)
+      return 'failed'
+    }
+  }
+  export async function saveConfig(msg: string) {
+    let { id, config }: Message.Task.ModifiedConfig = JSON.parse(msg)
+    let task = taskDB.data.tasks.find(item => item.id == id)!
+    fs.writeFileSync(task.path + '\\config.json', JSON.stringify(config))
+    let result: Message.Task.Result = { result: 'success' }
+    return JSON.stringify(result)
+  }
+
+  //主站发布获取信息
+  export async function getForumConfig(msg: string) {
+    try {
+      let { id }: Message.Task.TaskID = JSON.parse(msg)
+      let task = taskDB.data.tasks.find(item => item.id == id)!
+      let result: Message.Forum.Contents = {}
+      //从模版创建则生成发布稿
+      if (task.type == 'template') {
+        const config: Config.PublishConfig = await JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+        let info = config.content as Config.Content_template
+        let note = ''
+        if (info.note)
+          info.note.forEach(item => { note += item + ' + ' })
+        if (note != '')
+            note = note.slice(0, -2)
+        if (info.reseed)
+            note += `Reseed${info.rsVersion > 1 ? ` v${info.rsVersion}` : ''} Fin`
+        else
+            note += 'Fin'
+        let title = `${info.title_EN}${info.title_CN == '' ? '' : ' / ' +  info.title_CN} ${info.depth} ${info.resolution} ` 
+                  + `${info.encoding} ${info.contentType} [${note}]`
+        result.title = title
+        let team_CN = '', content = ''
+        if (info.nomination)
+          content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。\n\n'
+        if (info.subTeam_CN) {
+          info.subTeam_CN.forEach(item => { team_CN += item + ' & ' })
+        }
+        if (team_CN != ''){
+          team_CN = team_CN.slice(0, -3)
+          content += `这个项目与 <strong>${team_CN}</strong> 合作，感谢他们精心制作的字幕。\n\n`
+        }
+        content += info.comment_CN + '\n\n'
+        if (info.sub_CN && info.sub_CN != '') {
+          content += info.sub_CN + '\n'
+        }
+        if (info.audio_CN && info.audio_CN != '') {
+          content += info.audio_CN + '\n'
+        }
+        if (content.slice(-2) != '\n\n') content += '\n'
+        if (info.nonsense && info.nonsense != '') {
+          content += info.nonsense + '\n\n'
+        }
+        content += '<!--more-->\n\n感谢所有参与制作者：\n'
+        content += `总监：${info.members.script}\n`
+        content += `压制：${info.members.encode}\n`
+        content += `整理：${info.members.collate}\n`
+        content += `发布：${info.members.upload}\n`
+        content += '分流：VCB-Studio CDN 分流成员\n\n'
+        if (info.reseed) {
+          content += '[box style="info"]\n重发修正：\n\n'
+          content += info.rsComment_CN + '\n[/box]\n\n'
+        }
+        content += '[box style="download"]\n'
+        content += `${info.depth} ${info.resolution} ${info.encoding}${info.reseed ? ' (Reseed)' : ''}`
+        content += '\n\n链接加载中[/box]\n\n'
+        if (info.reseed) 
+          content += '<hr />\n\n请将旧链放于此\n\n'
+        if (info.imageCredit != '') {
+          content += `Image Credit: <a href="${info.imageSource}" rel="noopener" target="_blank">${info.imageCredit}</a>\n\n`
+        }
+        content += '<label for="medie-info-switch" class="btn btn-inverse-primary" title="展开MediaInfo">MediaInfo</label>\n\n'
+        content += '<pre class="js-medie-info-detail medie-info-detail" style="display: none">\n'
+        if (info.mediaInfo == '') 
+          content += '请将MediaInfo放置于此'
+        else 
+          content += info.mediaInfo
+        content += '\n</pre>'
+        result.content = content
+        result.imagePath = info.imagePath
+      }
+      return JSON.stringify(result)
+    }
+    catch (err) {
+      console.log(err)
+      dialog.showErrorBox('错误', (err as Error).message)
+      return
+    }
+  }
+
+}
+
 app.whenReady().then(async () => {
   //设置应用数据库
-  db = await JSONFilePreset<Data>(app.getPath('userData') + '\\easypublish-db.json', defaultData)
-  await db.write()
-  //响应通信
-  ipcMain.handle('openFile', handleFileOpen)
-  ipcMain.handle('openDirectory', openDirectory)
-  ipcMain.handle('createTask', createTask)
-  ipcMain.handle("createWithFile", createWithFile)
-  ipcMain.handle("createWithText", createWithText)
-  ipcMain.handle("saveContent", saveContent)
-  ipcMain.handle('openTask', openTask)
-  ipcMain.handle('checkTask', checkTask)
-  ipcMain.handle('saveFileContent', saveFileContent)
-  ipcMain.handle('getBangumiTag', getBangumiTags)
-  ipcMain.handle('searchBangumiTag', searchBangumiTags)
-  ipcMain.handle('getLoginInfo', getLoginInfo)
-  ipcMain.handle('getProxyConfig', _event => JSON.stringify(db.data.proxyConfig))
-  ipcMain.handle('getAllTask', _event => db.data.posts)
-  ipcMain.handle('getPublishInfo', getPublishInfo)
-  ipcMain.handle('getSiteInfo', getSiteInfo)
-  ipcMain.handle('getBTLinks', getBTLinks)
-  ipcMain.handle('checkAcount', checkAccount)
-  ipcMain.handle('readFileContent', readFileContent)
-  ipcMain.handle('publish', BTPublish)
-  ipcMain.handle('sitePublish', sitePublish)
-  ipcMain.handle('siteRSPublish', siteRSPublish)
-  ipcMain.handle('setSiteUAP', setSiteUAP)
-  ipcMain.handle('getSiteSrc', getSiteSrc)
-  ipcMain.handle('searchPosts', searchPosts)
-  ipcMain.handle('loadFromTxt', loadFromTxt)
-  ipcMain.on('setProxyConfig', setProxyConfig)
-  ipcMain.on('saveAccountInfo', saveAccountInfo)
-  ipcMain.on('checkLoginStatus', (_event, type: string, value: string) => checkLogin(type, value))
-  ipcMain.on('removeTask', removeTask)
-  ipcMain.on('clearStorage', clearStorage)
-  ipcMain.on('writeClipboard', writeClipboard)
-  ipcMain.on('exportCookies', exportCookies)
-  ipcMain.on('importCookies', importCookies)
-  ipcMain.on('exportContent', exportContent)
+  userDB = await JSONFilePreset<Config.UserData>(app.getPath('userData') + '\\easypublish-user-db.json', defaultUserData)
+  taskDB = await JSONFilePreset<Config.TaskData>(app.getPath('userData') + '\\easypublish-task-db.json', defaultTaskData)
+  await userDB.write()
+  await taskDB.write()
+  //获取登录窗口回话
+  BT.ses = session.fromPartition('persist:login')
+  //注册IPC通信
+  ipcMain.handle('global_getProxyConfig', _event => Global.getProxyConfig())
+  ipcMain.handle('global_getFilePath', (_event, msg) => Global.getFilePath(msg))
+  ipcMain.handle('global_getFolderPath', _event => Global.getFolderPath())
+  ipcMain.handle('global_readFileContent', _event => Global.readFileContent())
+  ipcMain.handle('global_html2markdown', (_event, msg) => Global.html2markdown(msg))
+  ipcMain.handle('global_html2bbcode', (_event, msg) => Global.html2bbcode(msg))
+  ipcMain.handle('BT_getTorrentList', _event => BT.getTorrentList())
+  ipcMain.handle('BT_checkLoginStatus', (_event, msg) => BT.checkLoginStatus(msg))
+  ipcMain.handle('BT_getAccountInfo', (_event, msg) => BT.getAccountInfo(msg))
+  ipcMain.handle('BT_publish', (_event, msg) => BT.publish(msg))
+  ipcMain.handle('BT_getBangumiTags', (_event, msg) => BT.getBangumiTags(msg))
+  ipcMain.handle('BT_searchBangumiTags', (_event, msg) => BT.searchBangumiTags(msg))
+  ipcMain.handle('BT_getBTLinks', (_event, msg) => BT.getBTLinks(msg))
+  ipcMain.handle('BT_getTorrentDetail', (_event, msg) => BT.getTorrentDetail(msg))
+  ipcMain.handle('BT_updateTorrent', (_event, msg) => BT.updateTorrent(msg))
+  ipcMain.handle('forum_getAccountInfo', _event => Forum.getAccountInfo())
+  ipcMain.handle('forum_searchPosts', (_event, msg) => Forum.searchPosts(msg))
+  ipcMain.handle('forum_publish', (_event, msg) => Forum.publish(msg))
+  ipcMain.handle('forum_rsPublish', (_event, msg) => Forum.rsPublish(msg))
+  ipcMain.handle('task_createTask', (_event, msg) => Task.createTask(msg))
+  ipcMain.handle('task_getTaskList', _event => Task.getTaskList())
+  ipcMain.handle('task_getTaskType', (_event, msg) => Task.getTaskType(msg))
+  ipcMain.handle('task_getForumLink', (_event, msg) => Task.getForumLink(msg))
+  ipcMain.handle('task_getContent', (_event, msg) => Task.getContent(msg))
+  ipcMain.handle('task_getPublishStatus', (_event, msg) => Task.getPublishStatus(msg))
+  ipcMain.handle('task_getPublishConfig', (_event, msg) => Task.getPublishConfig(msg))
+  ipcMain.handle('task_loadComparisons', _event => Task.loadComparisons())
+  ipcMain.handle("task_saveConfig", (_event, msg) => Task.saveConfig(msg))
+  ipcMain.handle("task_createConfig", (_event, msg) => Task.createConfig(msg))
+  ipcMain.handle('task_getForumConfig', (_event, msg) => Task.getForumConfig(msg))
+  ipcMain.on('global_setProxyConfig', (_event, msg) => Global.setProxyConfig(msg))
+  ipcMain.on('global_openFolder', (_event, msg) => Global.openFolder(msg))
+  ipcMain.on('global_writeClipboard', (_event, msg) => Global.writeClipboard(msg))
+  ipcMain.on('BT_loginAccount', (_event, msg) => BT.loginAccount(msg))
+  ipcMain.on('BT_openLoginWindow', (_event, msg) => BT.openLoginWindow(msg))
+  ipcMain.on('BT_saveAccountInfo', (_event, msg) => BT.saveAccountInfo(msg))
+  ipcMain.on('BT_clearStorage', (_event) => BT.clearStorage())
+  ipcMain.on('BT_exportCookies', (_event, msg) => BT.exportCookies(msg))
+  ipcMain.on('BT_importCookies', (_event, msg) => BT.importCookies(msg))
+  ipcMain.on('forum_saveAccountInfo', (_event, msg) => Forum.saveAccountInfo(msg))
+  ipcMain.on('task_removeTask', (_event, msg) => Task.removeTask(msg))
+  ipcMain.on('task_setTaskProcess', (_event, msg) => Task.setTaskProcess(msg))
+  ipcMain.on('task_saveContent', (_event, msg) => Task.saveContent(msg))
+  ipcMain.on('task_exportContent', (_event, msg) => Task.exportContent(msg))
+  ipcMain.on('task_saveTitle', (_event, msg) => Task.saveTitle(msg))
 
   //配置axios代理
-  let pconf = db.data.proxyConfig
+  let pconf = userDB.data.proxyConfig
   if (pconf.status) {
     if (pconf.type == "socks") {
       axios.defaults.httpsAgent = new socksProxy.SocksProxyAgent(`socks://${pconf.host}:${pconf.port}`)

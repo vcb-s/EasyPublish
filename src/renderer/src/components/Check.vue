@@ -1,5 +1,5 @@
 <script setup lang="ts" name="Check">
-    import { defineProps, onMounted, ref, computed } from "vue"
+    import { onMounted, ref, computed } from "vue"
     import { Edit, RefreshRight, Upload } from '@element-plus/icons-vue'
     import { marked } from 'marked'
     import bbobHTML from '@bbob/html'
@@ -14,7 +14,7 @@
     const clientHeight = ref(0)
     function setHeight() {
         clientHeight.value =  document.documentElement.clientHeight;
-        slbHeight.value = clientHeight.value - 117 + 'px';
+        slbHeight.value = clientHeight.value - 137 + 'px';
     }
     function setscrollbar() {
         setHeight()
@@ -33,7 +33,7 @@
     })
     const md_rendered = computed(() => {
         if (md.value == '') return empty
-        else return marked.parse(md.value)
+        else return marked.parse(md.value, { async: false })
 
     })
     const bbcode_rendered = computed(() => {
@@ -41,21 +41,22 @@
         let value = bbcode.value.replace(/\n/g, '<br/>')
         return bbobHTML(value, presetHTML5())
     })
-    const file_type = ref('html')
+    const fileType = ref('html')
     const isRender = ref('true')
     const type = computed<number>(()=>{
-        if (file_type.value == 'html' && isRender.value == 'true') return 1
-        if (file_type.value == 'html' && isRender.value == 'false') return 2
-        if (file_type.value == 'md' && isRender.value == 'true') return 3
-        if (file_type.value == 'md' && isRender.value == 'false') return 4
-        if (file_type.value == 'bbcode' && isRender.value == 'true') return 5
-        if (file_type.value == 'bbcode' && isRender.value == 'false') return 6
+        if (fileType.value == 'html' && isRender.value == 'true') return 1
+        if (fileType.value == 'html' && isRender.value == 'false') return 2
+        if (fileType.value == 'md' && isRender.value == 'true') return 3
+        if (fileType.value == 'md' && isRender.value == 'false') return 4
+        if (fileType.value == 'bbcode' && isRender.value == 'true') return 5
+        if (fileType.value == 'bbcode' && isRender.value == 'false') return 6
         return 0
     })
 
     //获取任务信息
-    async function getTaskInfo() {
-        const result = await window.api.CheckTask(props.id)
+    async function loadData() {
+        let msg: Message.Task.TaskID = { id: props.id }
+        const result = JSON.parse(await window.taskAPI.getContent(JSON.stringify(msg)))
         html.value = result.html
         md.value = result.md
         bbcode.value = result.bbcode
@@ -63,44 +64,55 @@
     }
 
     //保存文件内容
-    async function saveFileContent() {
+    async function saveContent() {
         let content: string
-        if (file_type.value == 'html') content = html.value
-        else if (file_type.value == 'md') content = md.value
+        if (fileType.value == 'html') content = html.value
+        else if (fileType.value == 'md') content = md.value
         else content = bbcode.value
-        let result = await window.api.SaveFileContent(props.id, file_type.value, content, title.value)
-        if (result)
-            ElMessage({
-                message: '保存成功',
-                type: 'success',
-                plain: true,
-            })
-        else
-            ElMessage.error('保存失败')
+        let msg: Message.Task.ModifiedContent = {
+            id: props.id,
+            type: fileType.value,
+            content
+        }
+        window.taskAPI.saveContent(JSON.stringify(msg))
+    }
+    //保存标题
+    async function saveTitle() {
+        let msg: Message.Task.ModifiedTitle = { 
+            id: props.id, 
+            title: title.value 
+        }
+        window.taskAPI.saveTitle(JSON.stringify(msg))
     }
 
     //导出文件内容
     async function exportContent() {
-        window.api.ExportContent(props.id, file_type.value)
+        let msg: Message.Task.ContentType = {
+            id: props.id,
+            type: fileType.value
+        }
+        window.taskAPI.exportContent(JSON.stringify(msg))
     }
 
     //跳转
-    function toCreate() {
+    function back() {
         router.push({
-            name: 'create',
+            name: 'edit',
             params: {id: props.id}
         })
     }
-    function toPublish() {
+    function next() {
         router.push({
-            name: 'publish',
+            name: 'bt_publish',
             params: {id: props.id}
         })
     }
 
     onMounted(() => {
         setscrollbar()
-        getTaskInfo()
+        let message: Message.Task.TaskStatus = { id: props.id, step: 'check' }
+        window.taskAPI.setTaskProcess(JSON.stringify(message))
+        loadData()
     })
 
 </script>
@@ -112,10 +124,10 @@
                 <el-col :span="3" />
                 <el-col :span="18">
                     <span style="float: left">
-                        <el-link :underline="false" @click="toCreate" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
+                        <el-link :underline="false" @click="back" type="primary"><el-icon><ArrowLeft /></el-icon>上一步</el-link>
                     </span>
                     <span style="float: right">
-                        <el-link :underline="false" @click="toPublish" type="primary">下一步<el-icon><ArrowRight /></el-icon></el-link>
+                        <el-link :underline="false" @click="next" type="primary">下一步<el-icon><ArrowRight /></el-icon></el-link>
                     </span>
                 </el-col>
                 <el-col :span="3" />
@@ -134,7 +146,7 @@
                 <el-col :span="18">
                     <div>
                         <span>
-                            <el-radio-group v-model="file_type">
+                            <el-radio-group v-model="fileType">
                                 <el-radio-button label="Html" value="html" />
                                 <el-radio-button label="Markdown" value="md" />
                                 <el-radio-button label="BBCode" value="bbcode" />
@@ -149,10 +161,10 @@
                         <span>
                             <el-button-group style="float: right;text-align: right;">
                                 <el-tooltip content="保存" placement="top">
-                                    <el-button @click="saveFileContent()" type="primary" :icon="Edit" plain />
+                                    <el-button @click="saveContent()" type="primary" :icon="Edit" plain />
                                 </el-tooltip>
                                 <el-tooltip content="重新加载" placement="top">
-                                    <el-button @click="getTaskInfo()" type="primary" :icon="RefreshRight" plain />
+                                    <el-button @click="loadData()" type="primary" :icon="RefreshRight" plain />
                                 </el-tooltip>
                                 <el-tooltip content="导出" placement="top">
                                     <el-button @click="exportContent()" type="primary" :icon="Upload" plain />
@@ -160,7 +172,7 @@
                             </el-button-group>
                         </span>
                     </div>
-                    <el-input v-model="title" style="margin-top: 20px;" maxlength="128" show-word-limit/>
+                    <el-input v-model="title" style="margin-top: 20px;" maxlength="128" show-word-limit @blur="saveTitle"/>
                 </el-col>
                 <el-col :span="3" />
             </el-row>
@@ -207,10 +219,10 @@
             <el-row style="height: 20px;" />
             <el-row class="title">
                 <el-col>
-                    <el-button class="btn" @click="toCreate()" type="primary" plain>
+                    <el-button class="btn" @click="back" type="primary" plain>
                         上一步
                     </el-button>
-                    <el-button class="btn" @click="toPublish()" type="primary">
+                    <el-button class="btn" @click="next" type="primary">
                         下一步
                     </el-button>  
                 </el-col>  

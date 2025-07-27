@@ -1,16 +1,17 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 
 import Home from '../components/Home.vue'
-import New from '../components/New.vue'
+import CreateTask from '../components/CreateTask.vue'
+import Task from '../components/Task.vue'
 import Edit from '../components/Edit.vue'
-import Create from '../components/Create.vue'
 import Check from '../components/Check.vue'
-import Publish from '../components/Publish.vue'
-import Site from '../components/Site.vue'
+import BTPublish from '../components/BTPublish.vue'
+import ForumPublish from '../components/ForumPublish.vue'
 import Finish from '../components/Finish.vue'
-import Login from '../components/Login.vue'
-import Localtask from '../components/Localtask.vue'
+import Account from '../components/Account.vue'
+import TaskList from '../components/TaskList.vue'
 import Quickstart from '../components/Quickstart.vue'
+import Modify from '../components/Modify.vue'
 
 const router = createRouter(
     {
@@ -21,19 +22,19 @@ const router = createRouter(
                 component: Home
             },
             {
-                name: 'new',
-                path: '/new', 
-                component: New
+                name: 'create_task',
+                path: '/create_task', 
+                component: CreateTask
             },
             {
-                name: 'edit',
-                path: '/edit',
-                component: Edit,
+                name: 'task',
+                path: '/task',
+                component: Task,
                 children: [
                     {
-                        name: 'create',
-                        path: 'create/:id',
-                        component: Create,
+                        name: 'edit',
+                        path: 'edit/:id',
+                        component: Edit,
                         props: true
                     },
                     {
@@ -43,15 +44,15 @@ const router = createRouter(
                         props: true
                     },
                     {
-                        name: 'publish',
-                        path: 'publish/:id',
-                        component: Publish,
+                        name: 'bt_publish',
+                        path: 'bt_publish/:id',
+                        component: BTPublish,
                         props: true
                     },
                     {
-                        name: 'site',
-                        path: 'site/:id',
-                        component: Site,
+                        name: 'forum_publish',
+                        path: 'forum_publish/:id',
+                        component: ForumPublish,
                         props: true
                     },
                     {
@@ -63,14 +64,19 @@ const router = createRouter(
                 ]
             },
             {
-                name: 'login',
-                path: '/login', 
-                component: Login
+                name: 'modify',
+                path: '/modify', 
+                component: Modify
             },
             {
-                name: 'localtask',
-                path: '/localtask', 
-                component: Localtask
+                name: 'account',
+                path: '/account', 
+                component: Account
+            },
+            {
+                name: 'task_list',
+                path: '/task_list', 
+                component: TaskList
             },
             {
                 name: 'quickstart',
