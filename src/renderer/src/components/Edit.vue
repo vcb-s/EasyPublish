@@ -26,18 +26,18 @@
         else
             callback()
     }
-    const checkComparisons_md = (_rules, _value, callback) => {
-        if (config.comparisons_md == '')
-            callback(new Error('请填写markdown对比图'))
-        else
-            callback()
-    }
-    const checkComparisons_bbcode = (_rules, _value, callback) => {
-        if (config.comparisons_bbcode == '')
-            callback(new Error('请填写bbcode对比图'))
-        else
-            callback()
-    }
+    // const checkComparisons_md = (_rules, _value, callback) => {
+    //     if (config.comparisons_md == '')
+    //         callback(new Error('请填写markdown对比图'))
+    //     else
+    //         callback()
+    // }
+    // const checkComparisons_bbcode = (_rules, _value, callback) => {
+    //     if (config.comparisons_bbcode == '')
+    //         callback(new Error('请填写bbcode对比图'))
+    //     else
+    //         callback()
+    // }
     //设置表单
     const loadCompleted = ref(false)
     const createForm_file = ref()
@@ -241,16 +241,16 @@
             validator: checkComparisons_html,
             trigger: 'blur'
         }],
-        comparisons_md: [{
-            required: true,
-            validator: checkComparisons_md,
-            trigger: 'blur'
-        }],
-        comparisons_bbcode: [{
-            required: true,
-            validator: checkComparisons_bbcode,
-            trigger: 'blur'
-        }]
+        // comparisons_md: [{
+        //     required: false,
+        //     validator: checkComparisons_md,
+        //     trigger: 'blur'
+        // }],
+        // comparisons_bbcode: [{
+        //     required: false,
+        //     validator: checkComparisons_bbcode,
+        //     trigger: 'blur'
+        // }]
     })
     //设置位深
     const depthOptions = ref([

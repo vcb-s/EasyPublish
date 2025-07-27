@@ -1862,10 +1862,8 @@ namespace BT {
       let content = data.match(/<textarea[\s\S]*?>([\s\S]*?)<\/textarea>/)![1]
       let category = data.match(/<option\sselected\svalue="([\s\S]*?)">/)![1]
       let information = data.match(/<input[\s\S]*?id="information"[\s\S]*?value="([\s\S]*?)"/)![1]
-      let remake = data.match(/<input[\s\S]*?id="is_remake"/)![0]
-      let is_remake = remake.includes('checked')
-      let complete = data.match(/<input[\s\S]*?id="is_complete"/)![0]
-      let is_complete = complete.includes('checked')
+      let is_remake = data.includes('<input checked id="is_remake"')
+      let is_complete = data.includes('<input checked id="is_complete"')
       result = { content, category, information, is_complete, is_remake }
       return result
     }
@@ -2578,6 +2576,7 @@ namespace Task {
       content += '特殊格式与说明： <a href="https://vcb-s.com/archives/7949" target="_blank">WebP 扫图说明</a><br />\n<br />\n</p>\n'
       if (!info.reseed) {
         content += '<hr />\n'
+        content += info.comparisons_html
       }
       let converter = new html2md()
       let md = converter.turndown(content)
@@ -2586,13 +2585,12 @@ namespace Task {
       let parsed_bbcode = reader.parse((md as string).replaceAll('\n* * *', ''))
       let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
       let html = content
-      if (!info.reseed) {
-        md += '\n\n' +  info.comparisons_md
-        html += info.comparisons_html
-        info.comparisons_bbcode = info.comparisons_bbcode!.replace(/IMG/g, 'img')
-        info.comparisons_bbcode = info.comparisons_bbcode!.replace(/URL/g, 'url')
-        bbcode += '\n' + info.comparisons_bbcode
-      }
+      // if (!info.reseed) {
+      //   md += '\n\n' +  info.comparisons_md
+      //   info.comparisons_bbcode = info.comparisons_bbcode!.replace(/IMG/g, 'img')
+      //   info.comparisons_bbcode = info.comparisons_bbcode!.replace(/URL/g, 'url')
+      //   bbcode += '\n' + info.comparisons_bbcode
+      // }
       fs.writeFileSync(task.path + '\\bangumi.html', html)
       fs.writeFileSync(task.path + '\\nyaa.md', md)
       fs.writeFileSync(task.path + '\\acgrip.bbcode', bbcode)

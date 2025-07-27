@@ -1,3 +1,8 @@
+# 1.3.1
+
+- 修复修改线上内容时Nyaa的remake和complete标识获取错误的问题
+- markdown和bbcode对比图改为从html直接转换
+
 # 1.3.0
 
 - 修复bbcode转换排版错误
