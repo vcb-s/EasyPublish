@@ -124,6 +124,10 @@
                 tabledata.find(item_ => item_.type == item)!.class = 'danger-row'
             }
         })
+        if (tabledata[1].status == '发布完成') {
+            tabledata[0].status = '发布完成'
+            tabledata[0].class = 'success-row'
+        }
     }
     
     //发布

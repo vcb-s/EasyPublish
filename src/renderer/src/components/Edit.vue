@@ -1,6 +1,7 @@
 <script setup lang="ts" name="Edit">
     import { onMounted, ref, reactive, computed } from "vue"
     import { useRouter } from 'vue-router'
+    import { Edit } from '@element-plus/icons-vue'
     import type { FormRules } from 'element-plus'
 
     const props = defineProps<{id: number}>()
@@ -17,6 +18,25 @@
         }
         else
             callback(new Error('请填写参与制作者'))
+    }
+    //设置对比图表单验证
+    const checkComparisons_html = (_rules, _value, callback) => {
+        if (config.comparisons_html == '')
+            callback(new Error('请填写html对比图'))
+        else
+            callback()
+    }
+    const checkComparisons_md = (_rules, _value, callback) => {
+        if (config.comparisons_md == '')
+            callback(new Error('请填写markdown对比图'))
+        else
+            callback()
+    }
+    const checkComparisons_bbcode = (_rules, _value, callback) => {
+        if (config.comparisons_bbcode == '')
+            callback(new Error('请填写bbcode对比图'))
+        else
+            callback()
     }
     //设置表单
     const loadCompleted = ref(false)
@@ -216,6 +236,21 @@
             message: '长度不得超过128', 
             trigger: 'change'
         }],
+        comparisons_html: [{
+            required: true,
+            validator: checkComparisons_html,
+            trigger: 'blur'
+        }],
+        comparisons_md: [{
+            required: true,
+            validator: checkComparisons_md,
+            trigger: 'blur'
+        }],
+        comparisons_bbcode: [{
+            required: true,
+            validator: checkComparisons_bbcode,
+            trigger: 'blur'
+        }]
     })
     //设置位深
     const depthOptions = ref([
@@ -545,7 +580,6 @@
         },
     ]
     //设置Bangumi标签
-    const remoteSearchEnable = ref(true)
     const isSearching = ref(false)
     type TagOptions = {
         label: string
@@ -560,8 +594,6 @@
         return suggestedBangumiTags.value.concat(inputBangumiTags.value)
     })
     async function getBangumiTags() {
-        if (!remoteSearchEnable.value) 
-            return
         let title = generateTitle()
         let msg: Message.BT.BangumiQuery = { query: taskType.value == 'template' ? config.title : title }
         const {data, status}: Message.BT.BangumiTags = JSON.parse(await window.BTAPI.getBangumiTags(JSON.stringify(msg)))
@@ -580,8 +612,6 @@
         }
     }
     const searchBangumiTags = async (query: string) =>{
-        if (!remoteSearchEnable.value) 
-            return
         let msg: Message.BT.BangumiQuery = { query }
         const {data, status}: Message.BT.BangumiTags = JSON.parse(await window.BTAPI.searchBangumiTags(JSON.stringify(msg)))
         if (status == 200) {
@@ -610,7 +640,7 @@
         else if (type == 'md') config.path_md = path
         else if (type == 'html') config.path_html = path
         else if (type == 'bbcode') config.path_bbcode = path
-        else if (type == 'webp') config.imageSource = path
+        else if (type == 'webp') config.imagePath = path
         isLoading.value = false
     }
 
@@ -733,6 +763,9 @@
         }
     }
 
+    //打开mediaInfo对话框
+    const editMediaInfo = ref(false)
+
     //从url.txt加载对比图
     async function loadComparisons() {
         let { html, md, bbcode }: Message.Task.Comparisons = JSON.parse(await window.taskAPI.loadComparisons())
@@ -740,6 +773,7 @@
         config.comparisons_md = md
         config.comparisons_bbcode = bbcode
     }
+    const editComparisons = ref(false)
     
     //设置滚动条区域高度
     const slbHeight = ref('')
@@ -979,8 +1013,8 @@
                             <el-form-item v-if="config.prefill" label="原图链接">
                                 <el-input v-model="config.imageSource" placeholder="填写Credit链接" />
                             </el-form-item>
-                            <el-form-item v-if="config.prefill" label="发布图链接">
-                                <el-input v-model="config.imagePath" placeholder="填写发布图链接">
+                            <el-form-item v-if="config.prefill" label="发布图路径">
+                                <el-input v-model="config.imagePath" placeholder="填写发布图路径">
                                     <template #append>
                                         <el-button @click="loadFile('webp')" v-loading.fullscreen.lock="isLoading">
                                             <el-icon><FolderOpened /></el-icon>
@@ -989,7 +1023,10 @@
                                 </el-input>
                             </el-form-item>
                             <el-form-item v-if="config.prefill" label="MediaInfo">
-                                <el-input v-model="config.mediaInfo" type="textarea" :autosize="{minRows: 10}" placeholder="填写MediaInfo" />
+                                <el-button link type="primary" @click="editMediaInfo = !editMediaInfo" :icon="Edit">编辑MediaInfo</el-button>
+                                <el-dialog v-model="editMediaInfo" width="900" title="编辑MediaInfo">
+                                    <el-input v-model="config.mediaInfo" type="textarea" :autosize="{minRows: 25}" placeholder="填写MediaInfo" />
+                                </el-dialog>
                             </el-form-item>
                             <el-form-item label="参与制作" prop="script">
                                 <el-row>
@@ -1012,34 +1049,36 @@
                                 <el-input v-model="config.providers" type="textarea" :autosize="{minRows: 3}" 
                                 :placeholder="'BD: XXXX@XXXX...\nSCAN: XXXX@XXXX...\nCD: XXXX@XXXX...'" />
                             </el-form-item>
-                            <div v-if="!config.reseed" style="margin-bottom: 20px;">
-                                <span style="margin-left: 123px;">
-                                    <el-radio-group v-model="urlType">
-                                        <el-radio-button label="Html" value="html" />
-                                        <el-radio-button label="Markdown" value="md" />
-                                        <el-radio-button label="BBCode" value="bbcode" />
-                                    </el-radio-group>
-                                </span>
-                                <span>
-                                    <el-button style="float: right;text-align: right;" @click="loadComparisons">
-                                        从url.txt加载<el-icon><Upload /></el-icon>
-                                    </el-button>
-                                </span>
-                            </div>
-                            <el-form-item v-if="!config.reseed && urlType == 'html'" label="对比图"
-                            :rules="{required: !config.reseed, message: '请填写对比图html部分', trigger: 'change'}">
-                                <el-input v-model="config.comparisons_html" type="textarea" :autosize="{minRows: 10}" 
-                                :placeholder="'<p>Comparison (right click on the image and open it in a new tab to see the full-size one)<br/>........'" />
-                            </el-form-item>
-                            <el-form-item v-if="!config.reseed && urlType == 'md'" label="对比图" 
-                            :rules="{required: !config.reseed, message: '请填写对比图markdown部分', trigger: 'change'}">
-                                <el-input v-model="config.comparisons_md" type="textarea" :autosize="{minRows: 10}" 
-                                :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
-                            </el-form-item>
-                            <el-form-item v-if="!config.reseed && urlType == 'bbcode'" label="对比图"
-                            :rules="{required: !config.reseed, message: '请填写对比图bbcode部分', trigger: 'change'}">
-                                <el-input v-model="config.comparisons_bbcode" type="textarea" :autosize="{minRows: 10}" 
-                                :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                            <el-form-item v-if="!config.reseed" label="对比图">
+                                <el-button link type="primary" @click="editComparisons = !editComparisons" :icon="Edit">编辑对比图</el-button>
+                                <el-dialog v-model="editComparisons" width="900" title="编辑对比图">
+                                    <div style="margin-bottom: 20px;">
+                                        <span>
+                                            <el-radio-group v-model="urlType">
+                                                <el-radio-button label="Html" value="html" />
+                                                <el-radio-button label="Markdown" value="md" />
+                                                <el-radio-button label="BBCode" value="bbcode" />
+                                            </el-radio-group>
+                                        </span>
+                                        <span>
+                                            <el-button style="float: right;text-align: right;" @click="loadComparisons">
+                                                从url.txt加载<el-icon><Upload /></el-icon>
+                                            </el-button>
+                                        </span>
+                                    </div>
+                                    <el-form-item v-show="urlType == 'html'" prop="comparisons_html">
+                                        <el-input v-model="config.comparisons_html" type="textarea" :autosize="{minRows: 15}" 
+                                        :placeholder="'<p>Comparison (right click on the image and open it in a new tab to see the full-size one)<br/>........'" />
+                                    </el-form-item>
+                                    <el-form-item v-show="urlType == 'md'" prop="comparisons_md">
+                                        <el-input v-model="config.comparisons_md" type="textarea" :autosize="{minRows: 15}" 
+                                        :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                                    </el-form-item>
+                                    <el-form-item v-show="urlType == 'bbcode'" prop="comparisons_bbcode">
+                                        <el-input v-model="config.comparisons_bbcode" type="textarea" :autosize="{minRows: 15}" 
+                                        :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                                    </el-form-item>
+                                </el-dialog>
                             </el-form-item>
                             <el-form-item label="种子文件路径" prop="torrentPath">
                                 <el-input placeholder="选择一个文件" v-model="config.torrentPath">
@@ -1050,17 +1089,14 @@
                                     </template>
                                 </el-input>
                             </el-form-item>
-                            <el-form-item label="远程搜索">
-                                <el-switch v-model="remoteSearchEnable" active-text="启用" inactive-text="关闭" />
-                            </el-form-item>
-                            <el-form-item label="Bangumi标签">
+                            <el-form-item label="萌番组标签">
                                 <el-select-v2
                                     v-model="config.tags" value-key="value" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
                                     :remote-method="searchBangumiTags" :loading="isSearching" @focus="getBangumiTags"
                                 />
                             </el-form-item>
-                            <el-form-item label="Bangumi分类" prop="category_bangumi">
+                            <el-form-item label="萌番组分类" prop="category_bangumi">
                                 <el-select-v2 v-model="config.category_bangumi" :options="BangumiOptions" placeholder="选择一个分类" style="width: 240px" />
                             </el-form-item>
                             <el-form-item label="Nyaa Info" prop="information">
@@ -1079,7 +1115,7 @@
                         <!-- 从文件创建 -->
                         <el-form ref="createForm_file" :model="config" label-width="auto" style="max-width: 1050px;" :rules="rules">
                             <el-form-item label="标题" prop="title">
-                                <el-input v-model="config.title" placeholder="请填写标题"/>
+                                <el-input v-model="config.title" maxlength="128" placeholder="请填写标题"/>
                             </el-form-item>
                             <el-form-item label="种子文件路径" prop="torrentPath">
                                 <el-input placeholder="选择一个文件" v-model="config.torrentPath">
@@ -1117,17 +1153,14 @@
                                     </template>
                                 </el-input>
                             </el-form-item>
-                            <el-form-item label="远程搜索">
-                                <el-switch v-model="remoteSearchEnable" active-text="启用" inactive-text="关闭" />
-                            </el-form-item>
-                            <el-form-item label="Bangumi标签">
+                            <el-form-item label="萌番组标签">
                                 <el-select-v2
                                     v-model="config.tags" value-key="label" placeholder="请选择或添加Bangumi标签"
                                     multiple filterable remote reserve-keyword style="width: 750px" :options="BangumiTags"
                                     :remote-method="searchBangumiTags" :loading="isSearching" @focus="getBangumiTags"
                                 />
                             </el-form-item>
-                            <el-form-item label="Bangumi分类" prop="category_bangumi">
+                            <el-form-item label="萌番组分类" prop="category_bangumi">
                                 <el-select-v2 v-model="config.category_bangumi" :options="BangumiOptions" placeholder="选择一个分类" style="width: 240px" />
                             </el-form-item>
                             <el-form-item label="Nyaa Info" prop="information">

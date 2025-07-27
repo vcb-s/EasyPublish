@@ -177,23 +177,17 @@
             <el-row justify="space-between">
                 <el-col :span="3" />
                 <el-col :span="18">
-                    <span style="font-size: x-large; font-weight: bold;">BT站账户</span>
+                    <span style="font-size: x-large; font-weight: bold;">BT 站账户</span>
                     <el-button style="float: right;text-align: right; margin-bottom: 20px;" 
-                    type="danger" plain
-                    :icon="Delete"
-                    @click="clearStorage()">
+                    type="danger" plain :icon="Delete" @click="clearStorage()">
                         清除缓存
                     </el-button>
                     <el-button style="float: right;text-align: right; margin-bottom: 20px; margin-right: 10px;" 
-                    type="primary" plain
-                    :icon="Key"
-                    @click="checkLoginStatus('all')">
+                    type="primary" plain :icon="Key" @click="checkLoginStatus('all')">
                         全部检查
                     </el-button>
                     <el-button style="float: right;text-align: right; margin-bottom: 20px;" 
-                    :icon="RefreshRight"
-                    @click="loadData()"
-                    plain>
+                    :icon="RefreshRight" @click="loadData()" plain>
                         刷新
                     </el-button>
                     <el-table style="width: 100%;" row-key="index" :data="tabledata" :row-class-name="tableRowClassName">
@@ -227,7 +221,7 @@
                                     <el-col :span="22">
                                         <el-form label-width="auto">
                                             <el-form-item label="启用账户">
-                                                <el-switch v-model="scope.row.enable" active-text="启用" inactive-text="禁用" @change="saveAccountInfo" />
+                                                <el-switch v-model="scope.row.enable" active-text="启用" inactive-text="禁用" @change="saveAccountInfo(scope.row.type)" />
                                             </el-form-item>
                                             <el-form-item label="用户名">
                                                 <el-input style="width: 300px;" @blur="saveAccountInfo(scope.row.type)" v-model="scope.row.username" />
@@ -242,7 +236,7 @@
                             </template>
                         </el-table-column>
                     </el-table>
-                    <h2>VCB主站账户</h2>
+                    <h2>VCB-Studio 主站账户</h2>
                     <el-row>
                         <el-form label-width="auto">
                             <el-form-item label="用户名">

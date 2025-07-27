@@ -10,7 +10,7 @@
 
     function back() {
         router.push({
-            name: type ? 'bt_publish' : 'forum_publish',
+            name: type == 'quick' ? 'bt_publish' : 'forum_publish',
             params: {id: props.id}
         })
     }

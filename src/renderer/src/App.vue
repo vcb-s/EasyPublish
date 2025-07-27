@@ -203,9 +203,9 @@
               <el-icon><FolderOpened /></el-icon>
               <span>管理本地任务</span>
             </el-menu-item>
-            <el-menu-item index="/onlinetask" disabled>
+            <el-menu-item index="/modify">
               <el-icon><Memo /></el-icon>
-              <span>管理线上任务</span>
+              <span>修改线上内容</span>
             </el-menu-item>
             <el-menu-item index="/account">
               <el-icon><Key /></el-icon>

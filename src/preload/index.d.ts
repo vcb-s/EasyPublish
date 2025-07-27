@@ -10,6 +10,8 @@ export interface GlobalAPI {
   openFolder: (msg: string) => void
   writeClipboard: (msg: string) => void
   readFileContent: () => Promise<string>
+  html2markdown: (msg: string) => Promise<string>
+  html2bbcode: (msg: string) => Promise<string>
 }
 
 export interface BTAPI {
@@ -28,6 +30,9 @@ export interface BTAPI {
   getBangumiTags: (msg: string) => Promise<string>
   searchBangumiTags: (msg: string) => Promise<string>
   getBTLinks: (msg: string) => Promise<string>
+  getTorrentList: () => Promise<string>
+  getTorrentDetail: (msg: string) => Promise<string>
+  updateTorrent: (msg: string) => Promise<string>
 }
 
 export interface ForumAPI {

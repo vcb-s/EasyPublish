@@ -63,6 +63,83 @@ declare namespace Message {
       data: any
     }
 
+    namespace TorrentDetail {
+
+      interface Detail<T> {
+        id: string
+        url: string
+        is_loaded: boolean
+        content?: T
+      }
+
+      interface BangumiDetail extends Detail<BangumiContent> {}
+      interface NyaaDetail extends Detail<NyaaContent> {}
+      interface AcgripDetail extends Detail<AcgripContent> {}
+      interface DmhyDetail extends Detail<DmhyContent> {}
+      interface AcgnxDetail extends Detail<AcgnxContent> {}
+
+      interface Content {
+        content: string
+      }
+
+      interface BangumiContent extends Content {
+        category_tag_id: string
+        tag_ids: string[]
+      }
+
+      interface NyaaContent extends Content {
+        category: string
+        information: string
+        is_complete: boolean
+        is_remake: boolean
+      }
+
+      interface AcgripContent extends Content {
+        series_id: string
+        post_as_team: string
+        category_id: string
+      }
+
+      interface DmhyContent extends Content {
+        synckey: string
+        sort_id: string
+        poster_url: string
+      }
+
+      interface AcgnxContent extends Content {
+        sort_id: string
+        synckey: string
+        discuss_url: string
+        team_post: string
+      }
+
+      interface Details {
+        title: string
+        bangumi?: BangumiDetail
+        nyaa?: NyaaDetail
+        acgrip?: AcgripDetail
+        dmhy?: DmhyDetail
+        acgnx_a?: AcgnxDetail
+        acgnx_g?: AcgnxDetail
+      }
+    }
+
+    interface TorrentList {
+      list: TorrentDetail.List[]
+    }
+
+    interface TorrentInfo {
+      id: string
+      type: string
+    }
+
+    interface UpdatedContent<T = TorrentDetail.Content>{
+      title: string
+      type: string
+      id: string
+      config: T
+    }
+
   }
 
   namespace Forum {

@@ -33,7 +33,7 @@
     })
     const md_rendered = computed(() => {
         if (md.value == '') return empty
-        else return marked.parse(md.value)
+        else return marked.parse(md.value, { async: false })
 
     })
     const bbcode_rendered = computed(() => {

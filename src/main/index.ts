@@ -60,7 +60,7 @@ const defaultUserData: Config.UserData = {
       status: '账号未登录',
       username: '',
       password: '',
-      enable: true,
+      enable: false,
       cookies: []
     },
     {
@@ -69,7 +69,7 @@ const defaultUserData: Config.UserData = {
       status: '账号未登录',
       username: '',
       password: '',
-      enable: true,
+      enable: false,
       cookies: []
     },
     {
@@ -78,7 +78,7 @@ const defaultUserData: Config.UserData = {
       status: '账号未登录',
       username: '',
       password: '',
-      enable: true,
+      enable: false,
       cookies: []
     },
     {
@@ -87,7 +87,7 @@ const defaultUserData: Config.UserData = {
       status: '账号未登录',
       username: '',
       password: '',
-      enable: true,
+      enable: false,
       cookies: []
     },
     {
@@ -96,7 +96,7 @@ const defaultUserData: Config.UserData = {
       status: '账号未登录',
       username: '',
       password: '',
-      enable: true,
+      enable: false,
       cookies: []
     },
     {
@@ -105,7 +105,7 @@ const defaultUserData: Config.UserData = {
       status: '账号未登录',
       username: '',
       password: '',
-      enable: true,
+      enable: false,
       cookies: []
     }]
 }
@@ -138,7 +138,25 @@ function getCurrentTime() {
   var currentTime = new Date(stamp).toISOString().replace(/T/, ' ').replace(/\..+/, '').substring(0, 19)
   return currentTime
 }
+//转义实体字符
+function escapeHtml(str: string) {
+  str = str.replace(/&/g, "&amp;")
+  str = str.replace(/</g, "&lt;")
+  str = str.replace(/>/g, "&gt;")
+  str = str.replace(/"/g, "&quot;")
+  str = str.replace(/'/g, "&#39;")
+  return str
+}
+function unescapeHtml(str: string) {
+  str = str.replace(/&lt;/g , "<")
+  str = str.replace(/&gt;/g , ">")
+  str = str.replace(/&quot;/g , "\"")
+  str = str.replace(/&#39;/g , "\'")
+  str = str.replace(/&amp;/g , "&")
+  return str
+}
 
+const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
 //axios拦截添加cookie和useragent,主站设置认证
 axios.interceptors.request.use(
   config => {
@@ -161,7 +179,7 @@ axios.interceptors.request.use(
       str += `${item.name}=${item.value}; `
     })
     config.headers['Cookie'] = str
-    config.headers['User-Agent'] = Config.userAgent
+    config.headers['User-Agent'] = userAgent
     return config
   },
   error => {console.log(error)}
@@ -256,7 +274,7 @@ function createWindow(): void {
       str += `${item.name}=${item.value}; `
     })
     details.requestHeaders['Cookie'] = str
-    details.requestHeaders['User-Agent'] = Config.userAgent
+    details.requestHeaders['User-Agent'] = userAgent
     callback({ requestHeaders: details.requestHeaders })
   })
   //设置代理
@@ -305,7 +323,7 @@ function createWindow(): void {
   })
 
   //主窗口关闭时同时关闭应用
-  mainWindow.on('close', _event => app.quit())
+  mainWindow.on('close', _event => app.exit())
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
@@ -382,7 +400,7 @@ async function createLoginWindow(type: string) {
 
   //拦截设置useragent
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['User-Agent'] = Config.userAgent
+    details.requestHeaders['User-Agent'] = userAgent
     callback({ requestHeaders: details.requestHeaders })
   })
   //配置代理
@@ -455,8 +473,28 @@ namespace Global {
     })
     let content = ''
     if (canceled) content = '' 
-    content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
+    else content = fs.readFileSync(filePaths[0], {encoding: 'utf-8'})
     let result: Message.Global.FileContent = { content }
+    return JSON.stringify(result)
+  }
+
+  //格式转换
+  export function html2markdown (msg: string) {
+    let { content }: Message.Global.FileContent = JSON.parse(msg)
+    let converter = new html2md()
+    content = converter.turndown(content)
+    let result: Message.Global.FileContent = { content }
+    return JSON.stringify(result)
+  } 
+  export function html2bbcode (msg: string) {
+    let { content }: Message.Global.FileContent = JSON.parse(msg)
+    let converter = new html2md()
+    let md = converter.turndown(content)
+    let reader = new commonmark.Parser()
+    let writer = new md2bbc.BBCodeRenderer()
+    let parsed = reader.parse(md.replaceAll('\n* * *', ''))
+    let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
+    let result: Message.Global.FileContent = { content: bbcode }
     return JSON.stringify(result)
   }
 }
@@ -475,12 +513,12 @@ namespace BT {
     try {
       let { type }: Message.BT.AccountType = JSON.parse(msg)
       if (type == 'all') {
-        checkLoginStatus('bangumi')
-        checkLoginStatus('nyaa')
-        checkLoginStatus('dmhy')
-        checkLoginStatus('acgrip')
-        checkLoginStatus('acgnx_a')
-        checkLoginStatus('acgnx_g')
+        checkLoginStatus('{"type":"bangumi"}')
+        checkLoginStatus('{"type":"nyaa"}')
+        checkLoginStatus('{"type":"dmhy"}')
+        checkLoginStatus('{"type":"acgrip"}')
+        checkLoginStatus('{"type":"acgnx_a"}')
+        checkLoginStatus('{"type":"acgnx_g"}')
         return ''
       }
       else {
@@ -553,8 +591,7 @@ namespace BT {
                 }).catch(err => {console.log(err)})
                 userDB.write()
               }
-              let msg: Message.BT.ReCaptchaType = { type: 'nyaa'}
-              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+              mainWindowWebContent.send('BT_loadIamgeCaptcha')
             }
           }
         }
@@ -564,6 +601,7 @@ namespace BT {
     }
     catch (err) {
       console.log(err)
+      dialog.showErrorBox('错误', (err as Error).message)
       return ''
     }
   }
@@ -1398,8 +1436,8 @@ namespace BT {
       formData.append('post[post_as_team]', '1')
       formData.append('post[content]', bbcode)
       formData.append('commit', '发布')
-      const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text' })
-      if (response.status == 302) { 
+      const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text', maxRedirects: 1 })
+      if ((response.data as string).includes('种子发布成功')) { 
         cookievalue = response.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
         userDB.data.info[2].cookies.find((item => item.name == '_kanako_session'))!.value = cookievalue
         await userDB.write()
@@ -1435,7 +1473,7 @@ namespace BT {
   //获取动漫花园链接
   //dmhy发布后不会返回发布的链接，需要从管理页获取，但网站数据同步还有延迟
   async function getDmhyLink(title: string) {
-    let ruleTitle = title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
+    let ruleTitle = escapeHtml(title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]'))
     var rule = new RegExp('<a\\shref="([\\S]*?)"[\\s]*?target="_blank">' + ruleTitle)
     let src = ''
     for (let index = 0; index < 5; index++) {
@@ -1451,7 +1489,7 @@ namespace BT {
   }
   //获取Acgrip的链接
   async function getAcgripLink(title: string) {
-    let ruletitle = title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]').replace(/&/g, '&amp;')
+    let ruletitle = escapeHtml(title.replace(/[\*\.\?\+\^\$\|\\\/\[\]\(\)\{\}\s]/g, '[\\S\\s]'))
     let rule = new RegExp('href="([\\S]*?)">' + ruletitle)
     let src = ''
     for (let index = 0; index < 5; index++) {
@@ -1469,7 +1507,7 @@ namespace BT {
     return src
   }
   //获取萌番组同步链接
-  async function getBangumiSyncLink(task: Config.Task, _id) {
+  async function getBangumiSyncLink(task: Config.Task, _id: string) {
     task.sync = true
     let data: any
     for (let index = 0; index < 5; index++) {
@@ -1483,33 +1521,41 @@ namespace BT {
       }
     }
     if (task.sync) return
-    if (data.sync.acgnx != '已存在相同的种子'){
-      task.acgnx_a = data.sync.acgnx
+    if (data.sync.acgnx) {
+      if (data.sync.acgnx != '已存在相同的种子'){
+        task.acgnx_a = data.sync.acgnx
+      }
+      else{
+        if (!task.acgnx_a)
+          task.acgnx_a = '种子已存在'
+      }
     }
-    else{
-      if (!task.acgnx_a)
-        task.acgnx_a = '种子已存在'
+    if (data.sync.acgnx_int) {
+      if (data.sync.acgnx_int != '已存在相同的种子'){
+        task.acgnx_g = data.sync.acgnx_int
+      }
+      else{
+        if (!task.acgnx_g)
+          task.acgnx_g = '种子已存在'
+      }
     }
-    if (data.sync.acgnx_int != '已存在相同的种子'){
-      task.acgnx_g = data.sync.acgnx_int
+    if (data.sync.acgrip) {
+      if (data.sync.acgrip != '已存在相同的种子'){
+        task.acgrip = data.sync.acgrip
+      }
+      else{
+        if (!task.acgrip)
+          task.acgrip = '种子已存在'
+      }
     }
-    else{
-      if (!task.acgnx_g)
-        task.acgnx_g = '种子已存在'
-    }
-    if (data.sync.acgrip != '已存在相同的种子'){
-      task.acgrip = data.sync.acgrip
-    }
-    else{
-      if (!task.acgrip)
-        task.acgrip = '种子已存在'
-    }
-    if (data.sync.dmhy != '已存在相同的种子'){
-      task.dmhy = data.sync.dmhy
-    }
-    else{
-      if (!task.dmhy)
-        task.dmhy = '种子已存在'
+    if (data.sync.dmhy) {
+      if (data.sync.dmhy != '已存在相同的种子'){
+        task.dmhy = data.sync.dmhy
+      }
+      else{
+        if (!task.dmhy)
+          task.dmhy = '种子已存在'
+      }
     }
   }
 
@@ -1578,6 +1624,448 @@ namespace BT {
     }
     return JSON.stringify(result)
   }
+
+  //获取已发布的种子列表
+  export async function getTorrentList() {
+    let loginInfo = userDB.data.info
+    let result: Message.BT.TorrentList = { list: [] }
+    if (loginInfo.find(item => item.name == 'bangumi')!.enable) {
+      let torrents = await getBangumiTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.bangumi = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            bangumi: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'nyaa')!.enable) {
+      let torrents = await getNyaaTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.nyaa = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            nyaa: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'acgrip')!.enable) {
+      let torrents = await getAcgripTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.acgrip = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            acgrip: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'dmhy')!.enable) {
+      let torrents = await getDmhyTorrentList()
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.dmhy = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            dmhy: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'acgnx_a')!.enable) {
+      let torrents = await getAcgnxTorrentList(false)
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.acgnx_a = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            acgnx_a: item.detail
+          })
+      })
+    }
+    if (loginInfo.find(item => item.name == 'acgnx_g')!.enable) {
+      let torrents = await getAcgnxTorrentList(true)
+      torrents.forEach(item => {
+        let torrent = result.list.find(element => element.title == item.title)
+        if (torrent)
+          torrent.acgnx_g = item.detail
+        else
+          result.list.push({
+            title: item.title,
+            acgnx_g: item.detail
+          })
+      })
+    }
+    return JSON.stringify(result)
+  }
+  async function getBangumiTorrentList() {
+    try {
+      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
+      let team_id: string = team.data[0]._id
+      let response = await axios.get('https://bangumi.moe/api/torrent/team?team_id=' + team_id, { responseType: 'json' })
+      let result: {title: string, detail: Message.BT.TorrentDetail.BangumiDetail}[] = []
+      response.data.torrents.forEach(item => {
+        result.push({
+          title: item.title,
+          detail: {
+            id: item._id,
+            url: 'https://bangumi.moe/torrent/' + item._id,
+            is_loaded: true,
+            content: {
+              category_tag_id: item.category_tag_id,
+              tag_ids: item.tag_ids,
+              content: item.introduction
+            }
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getNyaaTorrentList() {
+    try {
+      let team = await axios.get('https://nyaa.si/profile', { responseType: 'text' })
+      let teamName = (team.data as string).match(/Profile\sof\s<strong\sclass="text-default">([\s\S]*?)<\/strong>/)![1]
+      let response = await axios.get('https://nyaa.si/user/' + teamName, { responseType: 'text' })
+      let torrents = (response.data as string).match(/<tr\s\S*?>[\s\S]*?<\/tr>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.NyaaDetail}[] = []
+      torrents.forEach(item => {
+        let substr = item.match(/<td\scolspan="2">[\s\S]*?<\/td>/g)![0]
+        let [, link, title] = substr.match(/<a\shref="(\S*?)"\stitle="([\s\S]*?)">/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail: {
+            id: link.slice(6),
+            url: 'https://nyaa.si' + link,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getAcgnxTorrentList(global: boolean) {
+    try {
+      let baseUrl = ''
+      if (global) baseUrl = 'https://www.acgnx.se/'
+      else baseUrl = 'https://share.acgnx.se/'
+      let response = await axios.get(baseUrl + 'user.php?o=data', { responseType: 'text' })
+      let torrents = (response.data as string).match(/<tr\sclass="alt[12]\stext_center">[\s\S]*?<\/tr>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.AcgnxDetail}[] = []
+      torrents.forEach(item => {
+        let [, link, title] = item.match(/<a\shref="(\S*?)"\starget="_blank">(?!<)([\s\S]*?)<\/a>/)!
+        let [, id] = item.match(/user.php\?o=data&act=edit&id=(\d+)&type=/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail: {
+            id,
+            url: baseUrl + link,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getDmhyTorrentList() {
+    try {
+      let response = await axios.get('https://www.dmhy.org/topics/mlist/scope/team', { responseType: 'text' })
+      let torrents = (response.data as string).match(/<tr\sclass="">[\s\S]*?<\/tr>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.DmhyDetail}[] = []
+      torrents.forEach(item => {
+        let [, link, title] = item.match(/<a\shref="(\S*?)"\s+target="_blank">([\s\S]*?)<\/a>/)!
+        let [, id] = item.match(/"\/topics\/edit\/id\/(\d+)"/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail:{
+            id,
+            url: 'https://www.dmhy.org' + link,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+  async function getAcgripTorrentList() {
+    try {
+      let response = await axios.get('https://acg.rip/cp/posts', { responseType: 'text' })
+      let torrents = (response.data as string).match(/<div\sclass="list-group-item">[\s\S]*?<\/div>/g)!
+      let result: {title: string, detail: Message.BT.TorrentDetail.AcgripDetail}[] = []
+      torrents.forEach(item => {
+        let [, id, title] = item.match(/<a\shref="\/t\/(\d+)">([\s\S]*?)<\/a>/)!
+        result.push({
+          title: unescapeHtml(title),
+          detail: {
+            id,
+            url: 'https://acg.rip/t/' + id,
+            is_loaded: false
+          }
+        })
+      })
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return []
+    }
+  }
+
+  //获取已发布种子详情
+  export async function getTorrentDetail(msg: string) {
+    let { type, id }: Message.BT.TorrentInfo = JSON.parse(msg)
+    let result
+    if (type == 'nyaa')
+      result = await getNyaaTorrentDetail(id)
+    if (type == 'acgrip')
+      result = await getAcgripTorrentDetail(id)
+    if (type == 'acgnx_a')
+      result = await getAcgnxTorrentDetail(false, id)
+    if (type == 'acgnx_g')
+      result = await getAcgnxTorrentDetail(true, id)
+    if (type == 'dmhy')
+      result = await getDmhyTorrentDetail(id)
+    return JSON.stringify(result)
+  }
+  async function getNyaaTorrentDetail(id: string) {
+    try {
+      let response = await axios.get(`https://nyaa.si/view/${id}/edit`, { responseType: 'text'})
+      let data: string = response.data
+      let result: Message.BT.TorrentDetail.NyaaContent
+      let content = data.match(/<textarea[\s\S]*?>([\s\S]*?)<\/textarea>/)![1]
+      let category = data.match(/<option\sselected\svalue="([\s\S]*?)">/)![1]
+      let information = data.match(/<input[\s\S]*?id="information"[\s\S]*?value="([\s\S]*?)"/)![1]
+      let remake = data.match(/<input[\s\S]*?id="is_remake"/)![0]
+      let is_remake = remake.includes('checked')
+      let complete = data.match(/<input[\s\S]*?id="is_complete"/)![0]
+      let is_complete = complete.includes('checked')
+      result = { content, category, information, is_complete, is_remake }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+  async function getAcgripTorrentDetail(id: string) {
+    try {
+      let response = await axios.get(`https://acg.rip/cp/posts/${id}/edit`, { responseType: 'text'})
+      let data: string = response.data
+      let category_id = data.match(/<select[\s\S]*?id="post_category_id">[\s\S]*?<option\sselected="selected"\svalue="(\d)">/)![1]
+      let content = data.match(/<textarea[\s\S]*?id="post_content">([\s\S]*?)<\/textarea>/)![1]
+      let series_id = data.match(/<select\sname="post\[series_id\]"[\s\S]*?<option\sselected="selected"\svalue="(\d+)">/)![1]
+      let team = data.match(/<input[\s\S]*?id="post_post_as_team"\s\/>/)![0]
+      let post_as_team = team.includes('checked="checked"') ? '1' : '0'
+      let result: Message.BT.TorrentDetail.AcgripContent = { category_id, content, series_id, post_as_team }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+  async function getAcgnxTorrentDetail(global: boolean, id: string) {
+    try {
+      let url = ''
+      if (global) url = `https://www.acgnx.se/user.php?o=data&act=edit&id=${id}&type=`
+      else url = `https://share.acgnx.se/user.php?o=data&act=edit&id=${id}&type=`
+      let response = await axios.get(url, { responseType: 'text'})
+      let data: string = response.data
+      let content = data.match(/<textarea\sid="intro"[\s\S]*?>([\s\S]*?)<\/textarea>/)![1]
+      let sort_id = data.match(/<select\sid="sort_id"[\s\S]*?<option\svalue="(\d+)"\sselected="selected">/)![1]
+      let synckey = data.match(/<input[\s\S]*?id="synckey"[\s\S]*?value="([\s\S]*?)"\s\/>/)![1]
+      let discuss_url = data.match(/<input[\s\S]*?id="discuss_url"[\s\S]*?value="([\s\S]*?)"\s\/>/)![1]
+      let team = data.match(/<input[\s\S]*?name="Team_Post"\svalue="1"[\s\S]*?\/>/)![0]
+      let team_post = team.includes('checked="checked"') ? '1' : '0'
+      let result: Message.BT.TorrentDetail.AcgnxContent = { content, sort_id, synckey, discuss_url, team_post }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+  async function getDmhyTorrentDetail(id: string) {
+    try {
+      let response = await axios.get(`https://www.dmhy.org/topics/edit/id/${id}`, { responseType: 'text'})
+      let data: string = response.data
+      let sort_id = data.match(/<select\sname="sort_id"\sid="sort_id">[\s\S]*?<option\svalue="(\d+)"\s\S*\sselected="selected">/)![1]
+      let content = data.match(/<input[\s\S]*?name="bt_data_intro"\svalue="([\s\S]*?)"/)![1]
+      let poster_url = data.match(/<input[\s\S]*?id="poster_url"\svalue="([\s\S]*?)"/)![1]
+      let synckey = data.match(/<input[\s\S]*?id="synckey"\svalue="([\s\S]*?)"/)![1]
+      let result: Message.BT.TorrentDetail.DmhyContent = { content, sort_id, poster_url, synckey }
+      return result
+    }
+    catch (err) {
+      console.log(err)
+      return
+    }
+  }
+
+  //更新线上内容
+  export async function updateTorrent(msg: string) {
+    let { type, id, config, title }: Message.BT.UpdatedContent = JSON.parse(msg)
+    let result
+    if (type == 'bangumi') 
+      result = await updateBangumiTorrent(title, id, config as any)
+    if (type == 'nyaa')
+      result = await updateNyaaTorrent(title, id, config as any)
+    if (type == 'acgnx_a')
+      result = await updateAcgnxTorrent(false, title, id, config as any)
+    if (type == 'acgnx_g')
+      result = await updateAcgnxTorrent(true, title, id, config as any)
+    if (type == 'dmhy')
+      result = await updateDmhyTorrent(title, id, config as any)
+    if (type == 'acgrip')
+      result = await updateAcgripTorrent(title, id, config as any)
+    let message: Message.Task.Result = { result }
+    return JSON.stringify(message)
+  }
+  async function updateBangumiTorrent(title: string, id: string, config: Message.BT.TorrentDetail.BangumiContent) {
+    try {
+      const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
+      let team_id: string = team.data[0]._id
+      let data = {
+        category_tag_id: config.category_tag_id,
+        introduction: config.content.replaceAll('\n', ''),
+        tag_ids: config.tag_ids,
+        btskey: '',
+        _id: id,
+        title,
+        team_id
+      }
+      const response = await axios.post('https://bangumi.moe/api/torrent/update', data, { responseType: 'json' })
+      if (response.status == 200 && response.data.success)
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateNyaaTorrent(title: string, id: string, config: Message.BT.TorrentDetail.NyaaContent) {
+    try {
+      const formData = new FormData()
+      formData.append('display_name', title)
+      formData.append('category', config.category)
+      formData.append('information', config.information)
+      formData.append('description', config.content)
+      if (config.is_complete)
+        formData.append('is_complete', 'y')
+      if (config.is_remake)
+        formData.append('is_remake', 'y')
+      formData.append('submit', 'Save Changes')
+      const response = await axios.post(`https://nyaa.si/view/${id}/edit`, formData, { responseType: 'text' })
+      if ((response.data as string).includes('You should be redirected automatically to target URL'))
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateAcgnxTorrent(global: boolean, title: string, id: string, config: Message.BT.TorrentDetail.AcgnxContent) {
+    try {
+      const formData = new FormData()
+      formData.append('op', 'edit')
+      formData.append('id', id)
+      formData.append('sort_id', config.sort_id)
+      formData.append('title', title)
+      formData.append('intro', config.content)
+      formData.append('emule_resource', '')
+      formData.append('synckey', config.synckey)
+      formData.append('discuss_url', config.discuss_url)
+      formData.append('Team_Post', config.team_post)
+      if (global) {
+        formData.append('url', 'https%3A%2F%2Fwww.acgnx.se%2Fuser.php%3Fo%3Ddata')
+        formData.append('tos', '1')
+      }
+      else formData.append('url', 'https%3A%2F%2Fshare.acgnx.se%2Fuser.php%3Fo%3Ddata')
+      let url = global ? 'https://www.acgnx.se/user.php?o=data&type=' : 'https://share.acgnx.se/user.php?o=data&type='
+      const response = await axios.post(url, formData, { responseType: 'text' })
+      if (global && (response.data as string).includes('Successful!'))
+        return 'success'
+      if (!global && (response.data as string).includes('操作成功'))
+        return 'success'
+      return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateDmhyTorrent(title: string, id: string, config: Message.BT.TorrentDetail.DmhyContent) {
+    try {
+      const formData = new FormData()
+      formData.append('sort_id', config.sort_id)
+      formData.append('bt_data_title', title)
+      formData.append('poster_url', config.poster_url)
+      formData.append('bt_data_intro', config.content)
+      formData.append('synckey', '')
+      formData.append('submit', '提交')
+      formData.append('bt_data_id', id)
+      const response = await axios.post(`https://www.dmhy.org/topics/edit/id/${id}`, formData, { responseType: 'text' })
+      if ((response.data as string).includes('修改成功'))
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
+  async function updateAcgripTorrent(title: string, id: string, config: Message.BT.TorrentDetail.AcgripContent) {
+    try {
+      const tokenPage = await axios.get(`https://acg.rip/cp/posts/${id}/edit`, { responseType: 'text' })
+      let token = (tokenPage.data as string).match(/name="authenticity_token"\svalue="([\s\S]*?)"/)![1]
+      const formData = new FormData()
+      formData.append('_method', 'patch')
+      formData.append('authenticity_token', token)
+      formData.append('post[category_id]', config.category_id)
+      formData.append('post[series_id]', config.series_id)
+      formData.append('post[title]', title)
+      formData.append('post[post_as_team]', config.post_as_team)
+      formData.append('post[content]', config.content)
+      formData.append('commit', '更新')
+      const response = await axios.post(`https://acg.rip/cp/posts/${id}`, formData, { responseType: 'text', maxRedirects: 1 })
+      if ((response.data as string).includes('种子发布成功'))
+        return 'success'
+      else return 'failed'
+    }
+    catch (err) {
+      console.log(err)
+      return 'failed'
+    }
+  }
 }
 
 /* 
@@ -1608,6 +2096,8 @@ namespace Forum {
     let { title }: Message.Forum.Title = JSON.parse(msg)
     let result: Message.Forum.Posts = { posts: [] }
     const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?context=edit&search=' + title, { responseType: 'json' })
+    if (response.data.status == 401)
+      throw new Error('主站认证失败')
     response.data.forEach(item => {
       result.posts.push({
         id: item.id,
@@ -1963,7 +2453,7 @@ namespace Task {
         let reader = new commonmark.Parser()
         let writer = new md2bbc.BBCodeRenderer()
         let parsed = reader.parse((content as string).replaceAll('\n* * *', ''))
-        let bbcode = writer.render(parsed).slice(1)
+        let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
         fs.writeFileSync(task.path + '\\acgrip.bbcode', bbcode)
       } else
         fs.copyFileSync(info.path_bbcode, task.path + '\\acgrip.bbcode')
@@ -2027,7 +2517,9 @@ namespace Task {
         content += `这个项目与 <strong>${team_CN}</strong> 合作，感谢他们精心制作的字幕。<br />\n`
         content += `This project is in collaboration with <strong>${team_EN}</strong>. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
       }
-      let comment_CN = info.comment_CN.split('\n')
+      var p1=/([A-Za-z0-9_])([\u4e00-\u9fa5]+)/gi;
+      var p2=/([\u4e00-\u9fa5]+)([A-Za-z0-9_])/gi;
+      let comment_CN = info.comment_CN.replace(p1, "$1 $2").replace(p2, "$1 $2").split('\n')
       let comment_EN = info.comment_EN.split('\n')
       for (let i = 0; i <comment_CN.length; i++){
         content += comment_CN[i] + '<br />\n'
@@ -2092,7 +2584,7 @@ namespace Task {
       let reader = new commonmark.Parser()
       let bbcodeWriter = new md2bbc.BBCodeRenderer()
       let parsed_bbcode = reader.parse((md as string).replaceAll('\n* * *', ''))
-      let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1)
+      let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
       let html = content
       if (!info.reseed) {
         md += '\n\n' +  info.comparisons_md
@@ -2205,21 +2697,26 @@ app.whenReady().then(async () => {
   //设置应用数据库
   userDB = await JSONFilePreset<Config.UserData>(app.getPath('userData') + '\\easypublish-user-db.json', defaultUserData)
   taskDB = await JSONFilePreset<Config.TaskData>(app.getPath('userData') + '\\easypublish-task-db.json', defaultTaskData)
-  //获取登录窗口回话
-  BT.ses = session.fromPartition('persist:login')
   await userDB.write()
   await taskDB.write()
+  //获取登录窗口回话
+  BT.ses = session.fromPartition('persist:login')
   //注册IPC通信
   ipcMain.handle('global_getProxyConfig', _event => Global.getProxyConfig())
   ipcMain.handle('global_getFilePath', (_event, msg) => Global.getFilePath(msg))
   ipcMain.handle('global_getFolderPath', _event => Global.getFolderPath())
   ipcMain.handle('global_readFileContent', _event => Global.readFileContent())
+  ipcMain.handle('global_html2markdown', (_event, msg) => Global.html2markdown(msg))
+  ipcMain.handle('global_html2bbcode', (_event, msg) => Global.html2bbcode(msg))
+  ipcMain.handle('BT_getTorrentList', _event => BT.getTorrentList())
   ipcMain.handle('BT_checkLoginStatus', (_event, msg) => BT.checkLoginStatus(msg))
   ipcMain.handle('BT_getAccountInfo', (_event, msg) => BT.getAccountInfo(msg))
   ipcMain.handle('BT_publish', (_event, msg) => BT.publish(msg))
   ipcMain.handle('BT_getBangumiTags', (_event, msg) => BT.getBangumiTags(msg))
   ipcMain.handle('BT_searchBangumiTags', (_event, msg) => BT.searchBangumiTags(msg))
-  ipcMain.handle('BT_getBTLinks', (_eventm, msg) => BT.getBTLinks(msg))
+  ipcMain.handle('BT_getBTLinks', (_event, msg) => BT.getBTLinks(msg))
+  ipcMain.handle('BT_getTorrentDetail', (_event, msg) => BT.getTorrentDetail(msg))
+  ipcMain.handle('BT_updateTorrent', (_event, msg) => BT.updateTorrent(msg))
   ipcMain.handle('forum_getAccountInfo', _event => Forum.getAccountInfo())
   ipcMain.handle('forum_searchPosts', (_event, msg) => Forum.searchPosts(msg))
   ipcMain.handle('forum_publish', (_event, msg) => Forum.publish(msg))

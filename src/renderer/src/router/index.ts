@@ -11,6 +11,7 @@ import Finish from '../components/Finish.vue'
 import Account from '../components/Account.vue'
 import TaskList from '../components/TaskList.vue'
 import Quickstart from '../components/Quickstart.vue'
+import Modify from '../components/Modify.vue'
 
 const router = createRouter(
     {
@@ -61,6 +62,11 @@ const router = createRouter(
                         props: true
                     }
                 ]
+            },
+            {
+                name: 'modify',
+                path: '/modify', 
+                component: Modify
             },
             {
                 name: 'account',
