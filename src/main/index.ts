@@ -29,7 +29,7 @@ function initializeLog() {
   log.transports.file.resolvePathFn = ()=> app.getPath('userData') + '\\logs\\' + dateStr + '.log'
   log.initialize()
   console.log = log.log
-  console.log(app.getPath('userData') + '\\logs\\' + dateStr + '.log') 
+  log.info(app.getPath('userData') + '\\logs\\' + dateStr + '.log') 
 }
 initializeLog()
 //默认语言中文
@@ -182,7 +182,7 @@ axios.interceptors.request.use(
     config.headers['User-Agent'] = userAgent
     return config
   },
-  error => {console.log(error)}
+  error => {log.error(error)}
 )
 //阻止重定向和取消状态码异常
 axios.defaults.maxRedirects = 0
@@ -247,7 +247,7 @@ function createWindow(): void {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return new Response('bad', {
           status: 400,
           headers: { 'content-type': 'text/html' }
@@ -285,7 +285,7 @@ function createWindow(): void {
 
   //监听程序崩溃
   mainWindowWebContent.on('render-process-gone', (_e, detail) => {
-    console.log(detail)
+    log.error(detail)
     app.quit()
   })
 
@@ -355,12 +355,12 @@ async function createLoginWindow(type: string) {
   async function setCookies(type: string, url: string) {
     await ses.cookies.get({url: url}).then((cookies) => {
       userDB.data.info.find(item => item.name == type)!.cookies = cookies
-    }).catch(err => {console.log(err)})
+    }).catch(err => {log.error(err)})
     //单独处理末日动漫的cloudflare验证
     if (type.includes('acgnx'))
       await ses.cookies.get({name: 'cf_clearance'}).then((cookies) => {
         userDB.data.info.find(item => item.name == type)!.cookies.push(...cookies)
-      }).catch(err => {console.log(err)})
+      }).catch(err => {log.error(err)})
     await userDB.write()
   }
 
@@ -391,7 +391,7 @@ async function createLoginWindow(type: string) {
       mainWindowWebContent.send('BT_refreshLoginData')
     }
     catch(err){
-      console.log(err)
+      log.error(err)
     }
     finally{
       loginWindow.destroy()
@@ -441,7 +441,7 @@ namespace Global {
       properties:[ 'openFile' ],
       filters: [{name: type, extensions:[type]}]
     })
-    if (canceled) return ''
+    if (canceled) return '{"path" : ""}'
     let result: Message.Global.Path = { path: filePaths[0] }
     return JSON.stringify(result)
   }
@@ -450,7 +450,7 @@ namespace Global {
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties:[ 'openDirectory' ]
     })
-    if (canceled) return ''
+    if (canceled) return '{"path" : ""}'
     let result: Message.Global.Path = { path: filePaths[0] }
     return JSON.stringify(result)
   }
@@ -588,7 +588,7 @@ namespace BT {
                 });
                 await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
                   info.cookies.push(...cookies)
-                }).catch(err => {console.log(err)})
+                }).catch(err => {log.error(err)})
                 userDB.write()
               }
               mainWindowWebContent.send('BT_loadIamgeCaptcha')
@@ -600,7 +600,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       dialog.showErrorBox('错误', (err as Error).message)
       return ''
     }
@@ -629,7 +629,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       info.time = getCurrentTime()
     }
   }
@@ -657,7 +657,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       info.time = getCurrentTime()
     }
   }
@@ -685,7 +685,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       info.time = getCurrentTime()
     }
   }
@@ -713,7 +713,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       info.time = getCurrentTime()
     }
   }
@@ -753,7 +753,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       info.time = getCurrentTime()
     }
   }
@@ -793,7 +793,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       info.time = getCurrentTime()
     }
   }
@@ -831,7 +831,7 @@ namespace BT {
         });
         await ses.cookies.get({url: 'https://bangumi.moe'}).then((cookies) => {
           info.cookies.push(...cookies)
-        }).catch(err => {console.log(err)})
+        }).catch(err => {log.error(err)})
         info.time = getCurrentTime()
         info.status = '账号已登录'
         await userDB.write()
@@ -845,7 +845,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
     }
   }
   async function loginAcgrip(info: Config.LoginInfo) {
@@ -884,7 +884,7 @@ namespace BT {
         });
         await ses.cookies.get({url: 'https://acg.rip'}).then((cookies) => {
           info.cookies.push(...cookies)
-        }).catch(err => {console.log(err)})
+        }).catch(err => {log.error(err)})
         info.time = getCurrentTime()
         info.status = '账号已登录'
         await userDB.write()
@@ -892,7 +892,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
     }
   }
   async function loginNyaa(info: Config.LoginInfo, key: string) {
@@ -919,7 +919,7 @@ namespace BT {
         });
         await ses.cookies.get({url: 'https://nyaa.si'}).then((cookies) => {
           info.cookies.push(...cookies)
-        }).catch(err => {console.log(err)})
+        }).catch(err => {log.error(err)})
         info.time = getCurrentTime()
         info.status = '账号已登录'
         await userDB.write()
@@ -936,7 +936,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
     }
   }
   async function loginDmhy(info: Config.LoginInfo, key: string) {
@@ -966,7 +966,7 @@ namespace BT {
         });
         await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
           info.cookies.push(...cookies)
-        }).catch(err => {console.log(err)})
+        }).catch(err => {log.error(err)})
         info.time = getCurrentTime()
         info.status = '账号已登录'
         await userDB.write()
@@ -989,7 +989,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
     }
   }
   async function loginAcgnxG(info: Config.LoginInfo, key: string) {
@@ -1019,7 +1019,7 @@ namespace BT {
         });
         await ses.cookies.get({url: 'https://www.acgnx.se'}).then((cookies) => {
           info.cookies.push(...cookies)
-        }).catch(err => {console.log(err)})
+        }).catch(err => {log.error(err)})
         info.time = getCurrentTime()
         info.status = '账号已登录'
         await userDB.write()
@@ -1036,7 +1036,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
     }
   }
   async function loginAcgnxA(info: Config.LoginInfo, key: string) {
@@ -1066,7 +1066,7 @@ namespace BT {
         });
         await ses.cookies.get({url: 'https://share.acgnx.se'}).then((cookies) => {
           info.cookies.push(...cookies)
-        }).catch(err => {console.log(err)})
+        }).catch(err => {log.error(err)})
         info.time = getCurrentTime()
         info.status = '账号已登录'
         await userDB.write()
@@ -1083,7 +1083,7 @@ namespace BT {
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
     }
   }
 
@@ -1174,7 +1174,7 @@ namespace BT {
       let message: Message.Task.Result = { result }
       return JSON.stringify(message)
     } catch (err) {
-      console.log(err)
+      log.error(err)
       let message: Message.Task.Result = { result: 'failed' }
       return JSON.stringify(message)
     }
@@ -1213,12 +1213,12 @@ namespace BT {
         return 'exist'
       }
       else {
-        console.log(response)
+        log.error(response)
         return 'failed'
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1251,12 +1251,12 @@ namespace BT {
         return 'exist'
       }
       else {
-        console.log(response)
+        log.error(response)
         return 'failed'
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1307,12 +1307,12 @@ namespace BT {
         return 'success'
       }
       else {
-        console.log(response)
+        log.error(response)
         return 'failed'
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1351,12 +1351,12 @@ namespace BT {
         return 'exist'
       }
       else {
-        console.log(response)
+        log.error(response)
         return 'failed'
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1402,12 +1402,12 @@ namespace BT {
         return 'exist'
       }
       else {
-        console.log(response)
+        log.error(response)
         return 'failed'
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1436,8 +1436,8 @@ namespace BT {
       formData.append('post[post_as_team]', '1')
       formData.append('post[content]', bbcode)
       formData.append('commit', '发布')
-      const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text', maxRedirects: 1 })
-      if ((response.data as string).includes('种子发布成功')) { 
+      const response = await axios.post('https://acg.rip/cp/posts', formData, { responseType: 'text' })
+      if (response.status == 302) { 
         cookievalue = response.headers['set-cookie']![0].match(/_kanako_session=([\S]*?);/)![1]
         userDB.data.info[2].cookies.find((item => item.name == '_kanako_session'))!.value = cookievalue
         await userDB.write()
@@ -1461,12 +1461,12 @@ namespace BT {
         return 'exist'
       }
       else {
-        console.log(response)
+        log.error(response)
         return 'failed'
       }
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1733,7 +1733,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return []
     }
   }
@@ -1759,7 +1759,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return []
     }
   }
@@ -1786,7 +1786,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return []
     }
   }
@@ -1810,7 +1810,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return []
     }
   }
@@ -1833,7 +1833,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return []
     }
   }
@@ -1868,7 +1868,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return
     }
   }
@@ -1885,7 +1885,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return
     }
   }
@@ -1906,7 +1906,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return
     }
   }
@@ -1922,7 +1922,7 @@ namespace BT {
       return result
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return
     }
   }
@@ -1965,7 +1965,7 @@ namespace BT {
       else return 'failed'
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -1987,7 +1987,7 @@ namespace BT {
       else return 'failed'
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -2017,7 +2017,7 @@ namespace BT {
       return 'failed'
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -2037,7 +2037,7 @@ namespace BT {
       else return 'failed'
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -2054,13 +2054,13 @@ namespace BT {
       formData.append('post[post_as_team]', config.post_as_team)
       formData.append('post[content]', config.content)
       formData.append('commit', '更新')
-      const response = await axios.post(`https://acg.rip/cp/posts/${id}`, formData, { responseType: 'text', maxRedirects: 1 })
-      if ((response.data as string).includes('种子发布成功'))
+      const response = await axios.post(`https://acg.rip/cp/posts/${id}`, formData, { responseType: 'text' })
+      if (response.status == 302)
         return 'success'
       else return 'failed'
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       return 'failed'
     }
   }
@@ -2147,7 +2147,7 @@ namespace Forum {
       throw response
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       message.result = 'failed'
       return JSON.stringify(message)
     }
@@ -2179,7 +2179,7 @@ namespace Forum {
       throw response
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       message.result = 'failed'
       return JSON.stringify(message)
     }
@@ -2506,14 +2506,14 @@ namespace Task {
       }
       let team_CN = '', team_EN = ''
       if (info.subTeam_CN && info.subTeam_EN) {
-        info.subTeam_CN.forEach(item => { team_CN += item + ' & ' })
-        info.subTeam_EN.forEach(item => { team_EN += item + ' & ' })
+        info.subTeam_CN.forEach(item => { team_CN += `<strong>${item}</strong> 和 ` })
+        info.subTeam_EN.forEach(item => { team_EN += `<strong>${item}</strong> & ` })
       }
       if (team_CN != ''){
         team_CN = team_CN.slice(0, -3)
         team_EN = team_EN.slice(0, -3)
-        content += `这个项目与 <strong>${team_CN}</strong> 合作，感谢他们精心制作的字幕。<br />\n`
-        content += `This project is in collaboration with <strong>${team_EN}</strong>. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
+        content += `这个项目与 ${team_CN} 合作，感谢他们精心制作的字幕。<br />\n`
+        content += `This project is in collaboration with ${team_EN}. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
       }
       var p1=/([A-Za-z0-9_])([\u4e00-\u9fa5]+)/gi;
       var p2=/([\u4e00-\u9fa5]+)([A-Za-z0-9_])/gi;
@@ -2635,11 +2635,11 @@ namespace Task {
         if (info.nomination)
           content += '本番由 <strong>组员提名</strong>，应要求制作。感谢他们为 VCB-Studio 发展做出的无私奉献。\n\n'
         if (info.subTeam_CN) {
-          info.subTeam_CN.forEach(item => { team_CN += item + ' & ' })
+          info.subTeam_CN.forEach(item => { team_CN += `<strong>${item}</strong> 和 ` })
         }
         if (team_CN != ''){
           team_CN = team_CN.slice(0, -3)
-          content += `这个项目与 <strong>${team_CN}</strong> 合作，感谢他们精心制作的字幕。\n\n`
+          content += `这个项目与 ${team_CN} 合作，感谢他们精心制作的字幕。\n\n`
         }
         content += info.comment_CN + '\n\n'
         if (info.sub_CN && info.sub_CN != '') {
@@ -2683,7 +2683,7 @@ namespace Task {
       return JSON.stringify(result)
     }
     catch (err) {
-      console.log(err)
+      log.error(err)
       dialog.showErrorBox('错误', (err as Error).message)
       return
     }
