@@ -137,11 +137,19 @@
         let msg: Message.BT.AccountType = {type: index == 0 ? 'bangumi' : tabledata[index].type}
         const { status }: Message.BT.LoginStatus = JSON.parse(await window.BTAPI.checkLoginStatus(JSON.stringify(msg)))
         if (status != '账号已登录') {
-            tabledata[index].status = status
-            tabledata[index].class = 'warning-row'
-            return
+            if ((tabledata[index].type == 'acgnx_a' || tabledata[index].type == 'acgnx_g') && status == '账号未登录') {
+                tabledata[index].class = 'warning-row'
+                tabledata[index].status = '账号未登录,尝试使用API发布'
+            }
+            else {
+                tabledata[index].lock = false
+                tabledata[index].status = status
+                tabledata[index].class = 'warning-row'
+                return
+            }
         }
-        tabledata[index].status = '检查完成正在发布'
+        else
+            tabledata[index].status = '检查完成正在发布'
         let message: Message.Task.ContentType = { id: props.id, type: tabledata[index].type}
         for (let i = 1;i < 6;i++) {
             let { result }: Message.Task.Result = JSON.parse(await window.BTAPI.publish(JSON.stringify(message)))
@@ -159,7 +167,18 @@
                 tabledata[index].class = 'danger-row'
                 return
             }
+            if (result == 'unauthorized') {
+                tabledata[index].lock = false
+                tabledata[index].status = 'API账户无效'
+                tabledata[index].class = 'danger-row'
+                return
+            }
             if (result == 'failed') {
+                if (status == '账号未登录') {
+                    tabledata[index].lock = false
+                    tabledata[index].status = '账号未登录'
+                    tabledata[index].class = 'warning-row'
+                }
                 tabledata[index].status = '发布失败正在重试（' + i + '/5)'
                 tabledata[index].class = 'warning-row';
             }

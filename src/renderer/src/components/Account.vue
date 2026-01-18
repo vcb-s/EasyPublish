@@ -96,6 +96,28 @@
     }
     window.BTAPI.refreshLoginData(loadData)
 
+    //设置AcgnX API
+    const acgnxAPIConfig = ref<Config.AcgnXAPIConfig>({
+        enable: false,
+        asia: {
+            uid: '',
+            token: ''
+        },
+        global: {
+            uid: '',
+            token: ''
+        }
+    })
+    async function getAcgnXAPIConfig() {
+        let config: Message.BT.AcgnXAPIConfig = JSON.parse(await window.BTAPI.getAcgnXAPIConfig())
+        if (config) acgnxAPIConfig.value = config
+    }
+    async function saveAcgnXAPIConfig() {
+        let msg: Message.BT.AcgnXAPIConfig = acgnxAPIConfig.value
+        window.BTAPI.saveAcgnXAPIConfig(JSON.stringify(msg))
+        ElMessage('修改成功')
+    }
+
     //导入导出Cookies
     async function exportCookies(type: string) {
         let msg: Message.BT.AccountType = { type }
@@ -108,13 +130,12 @@
     
     //设置颜色
     const tableRowClassName = ({ rowIndex }: { rowIndex: number }) => {
-        if (tabledata[rowIndex].status == '访问失败') {
+        if (tabledata[rowIndex].status == '访问失败') 
             return 'danger-row'
-        } else if (tabledata[rowIndex].status == '账号已登录') {
+        else if (tabledata[rowIndex].status == '账号已登录') 
             return 'success-row'
-        } else if (tabledata[rowIndex].status == '防火墙阻止') {
+        else if (tabledata[rowIndex].status == '防火墙阻止') 
             return 'warning-row'
-        }
         return ''
     }
 
@@ -155,10 +176,28 @@
         password.value = msg.password
     }
 
+    //配置名称
+    const configName = ref('')
+    async function getConfigName() {
+        let { name }: Message.Global.ConfigName = JSON.parse(await window.globalAPI.getConfigName())
+        configName.value = name
+    }
+    async function setConfigName() {
+        let msg: Message.Global.ConfigName = { name: configName.value }
+        window.globalAPI.setConfigName(JSON.stringify(msg))
+    }
+    async function changeConfig() {
+        window.globalAPI.changeConfig()
+    }
+    async function createConfig() {
+        window.globalAPI.createConfig()
+    }
     
     onMounted(() => {
         loadData()
         getForumAccountInfo()
+        getConfigName()
+        getAcgnXAPIConfig()
         setscrollbar()
     })
 
@@ -191,29 +230,29 @@
                         刷新
                     </el-button>
                     <el-table style="width: 100%;" row-key="index" :data="tabledata" :row-class-name="tableRowClassName">
-                        <el-table-column fixed="right" label="检查" width="60">
+                        <el-table-column fixed="right" label="自动登录" width="90">
                             <template #default="scope">
-                                <el-button link type="primary" size="small" @click="checkLoginStatus(scope.row.type)">检查</el-button>
+                                <el-button link type="primary" size="small" @click="checkLoginStatus(scope.row.type)">检查/登录</el-button>
                             </template>
                         </el-table-column>
-                        <el-table-column fixed="right" label="导入" width="60">
+                        <el-table-column fixed="right" label="导入" width="55">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" @click="importCookies(scope.row.type)">导入</el-button>
                             </template>
                         </el-table-column>
-                        <el-table-column fixed="right" label="导出" width="60">
+                        <el-table-column fixed="right" label="导出" width="55">
                             <template #default="scope">
                                 <el-button link type="primary" size="small" @click="exportCookies(scope.row.type)">导出</el-button>
                             </template>
                         </el-table-column>
-                        <el-table-column fixed="right" label="登录" width="100">
+                        <el-table-column fixed="right" label="手动登录" width="90">
                             <template #default="scope">
-                                <el-button link type="primary" size="small" @click="openLoginWindow(scope.row.type)">打开网站</el-button>
+                                <el-button link type="primary" size="small" @click="openLoginWindow(scope.row.type)">手动登录</el-button>
                             </template>
                         </el-table-column>
                         <el-table-column prop="site" label="站点"/>
                         <el-table-column prop="time" label="上次检查时间" width="180" />
-                        <el-table-column prop="status" label="登录状态" width="120" />
+                        <el-table-column prop="status" label="登录状态" width="110" />
                         <el-table-column fixed="left" type="expand" width="50">
                             <template #default="scope">
                                 <el-row>
@@ -241,25 +280,58 @@
                         <el-form label-width="auto">
                             <el-form-item label="用户名">
                                 <el-input
-                                v-model="username"
-                                style="width: 240px"
-                                placeholder="填写主站用户名"
-                                @blur="saveForumAccountInfo"
-                                />
+                                v-model="username" style="width: 300px" placeholder="填写主站用户名" @blur="saveForumAccountInfo"  />
                             </el-form-item>
                             <el-form-item label="应用程序密码">
-                                <el-input
-                                v-model="password"
-                                style="width: 240px"
-                                placeholder="填写应用程序密码"
-                                @blur="saveForumAccountInfo"
-                                />
+                                <el-input v-model="password" style="width: 300px" placeholder="填写应用程序密码" @blur="saveForumAccountInfo" />
                             </el-form-item>
                         </el-form>
+                    </el-row>
+                    <h2>AcgnX API 设置</h2>
+                    <el-form label-width="auto">
+                        <el-form-item label="启用API">
+                            <el-checkbox @change="saveAcgnXAPIConfig" border label="优先尝试使用API发布" v-model="acgnxAPIConfig.enable"></el-checkbox>
+                        </el-form-item>
+                        <div v-if="acgnxAPIConfig.enable">
+                            <h3>末日动漫(亚太)</h3>
+                            <el-form-item label="UID">
+                                <el-input v-model="acgnxAPIConfig.asia.uid" style="width: 200px;" />
+                            </el-form-item>
+                            <el-form-item label="API Token">
+                                <el-input v-model="acgnxAPIConfig.asia.token" style="width: 400px;" />
+                            </el-form-item>
+                            <h3>AcgnX(国际)</h3>
+                            <el-form-item label="UID">
+                                <el-input v-model="acgnxAPIConfig.global.uid" style="width: 200px;" />
+                            </el-form-item>
+                            <el-form-item label="API Token">
+                                <el-input v-model="acgnxAPIConfig.global.token" style="width: 400px;" />
+                            </el-form-item>
+                            <el-button style="margin-left: 80px;" type="primary" @click="saveAcgnXAPIConfig">保存修改</el-button>
+                        </div>
+                    </el-form>
+                    <el-row style="height: 20px;" />
+                    <hr />
+                    <el-row>
+                        <div>
+                            <span>当前配置文件：</span>
+                            <span>
+                                <el-input v-model="configName" style="width: 150px" placeholder="填写配置文件名" @blur="setConfigName" />
+                            </span>
+                        </div>
+                        <div>
+                            <span style="margin-left: 20px;">
+                                <el-button plain @click="changeConfig">切换配置文件</el-button>
+                            </span>
+                            <span style="margin-left: 20px;">
+                                <el-button type="primary" plain @click="createConfig">新建配置文件</el-button>
+                            </span>
+                        </div>
                     </el-row>
                 </el-col>
                 <el-col :span="3" />
             </el-row>
+            <el-row style="height: 20px;" />
         </el-scrollbar>
     </div> 
 </template>

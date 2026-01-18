@@ -1,7 +1,7 @@
 <script setup lang="ts">
   import { RouterView } from 'vue-router'
   import { useDark, useToggle } from '@vueuse/core'
-  import { ref, reactive, onMounted } from 'vue'
+  import { ref, reactive, onMounted, useTemplateRef } from 'vue'
 
   const isDark = useDark()
   const toggleDark = () => useToggle(isDark)
@@ -42,52 +42,67 @@
   //人机验证对话框
   const imageDialogVisible = ref(false)
   const reCaptchaDialogVisible_nyaa = ref(false)
-  const reCaptchaDialogVisible_acgnx_a = ref(false)
-  const reCaptchaDialogVisible_acgnx_g = ref(false)
+  const turnstileDialogVisible_acgnx_a = ref(false)
+  const turnstileDialogVisible_acgnx_g = ref(false)
+  const turnstileValidation_acgnx_g = useTemplateRef('turnstileValidation_acgnx_g')
+  const turnstileValidation_acgnx_a = useTemplateRef('turnstileValidation_acgnx_a')
   const imgSrc = ref('')
   const imgCaptcha = ref('')
-  let reCaptcha = {nyaa: '', acgnx_a: '', acgnx_g: ''}
+  let reCaptcha = ''
   //图片验证码处理
   async function refreshImage() {
     imageDialogVisible.value = true
     imgSrc.value = 'https://www.dmhy.org/common/generate-captcha?code=' + Date.now()
   }
   window.BTAPI.loadImageCaptcha(refreshImage)
-  //处理reCaptcha验证
-  async function setReCaptcha(msg: string) {
-    let { type } = JSON.parse(msg) as Message.BT.ReCaptchaType
+  //处理reCaptcha验证和cloudflare-turnstile验证
+  async function setValidation(msg: string) {
+    let { type } = JSON.parse(msg) as Message.BT.ValidationType
     if (type == 'nyaa') {
       reCaptchaDialogVisible_nyaa.value = true
     }
-    if (type == 'acgnx_g') {
-      reCaptchaDialogVisible_acgnx_g.value = true
-    }
-    if (type == 'acgnx_a') {
-      reCaptchaDialogVisible_acgnx_a.value = true
+    else {
+      if (type == 'acgnx_g') 
+        turnstileDialogVisible_acgnx_g.value = true
+      else 
+        turnstileDialogVisible_acgnx_a.value = true
     }
   }
-  window.BTAPI.loadReCaptcha(setReCaptcha)
+  window.BTAPI.loadValidation(setValidation)
   window.addEventListener('message', e => {
-    let type = ''
-    if (e.origin == 'https://nyaa.si')
-      type = 'nyaa'
-    if (e.origin == 'https://www.acgnx.se')
-      type = 'acgnx_g'
-    if (e.origin == 'https://share.acgnx.se')
-      type = 'acgnx_a'
-    reCaptcha[type] = e.data
+    reCaptcha = e.data
+  })
+  window.BTAPI.closeValidation(() => {
+    turnstileDialogVisible_acgnx_g.value = false
+    turnstileDialogVisible_acgnx_a.value = false
   })
   //提交验证码
   async function submitCaptcha(type: string) {
     if (type == 'dmhy'){
-      let msg: Message.BT.Captcha = {type: 'dmhy', key: imgCaptcha.value}
+      let msg: Message.BT.ValidationInfo = {type: 'dmhy', key: imgCaptcha.value}
       window.BTAPI.loginAccount(JSON.stringify(msg))
       imageDialogVisible.value = false
     }
     else {
-      let msg: Message.BT.Captcha = {type: type, key: reCaptcha[type]}
+      let msg: Message.BT.ValidationInfo = {type: 'nyaa', key: reCaptcha}
       window.BTAPI.loginAccount(JSON.stringify(msg))
     }
+  }
+  //返回turnstile坐标
+  async function setTurnstilePosition(type: 'acgnx_g' | 'acgnx_a') {
+    let rect: DOMRect
+    if (type == 'acgnx_g')
+      rect = turnstileValidation_acgnx_g.value!.getBoundingClientRect()
+    else
+      rect = turnstileValidation_acgnx_a.value!.getBoundingClientRect()
+    
+      let position: Message.BT.TurnstilePosition = { x: rect.x, y: rect.y }
+      let msg: Message.BT.ValidationInfo = { type, position }
+      window.BTAPI.loginAccount(JSON.stringify(msg))
+  }
+  //主动关闭验证框
+  async function removeValidation() {
+    window.BTAPI.removeValidation()
   }
 </script>
 
@@ -95,7 +110,7 @@
   <div class="layout">
     <!--登录人机验证对话框-->
     <!-- 图形验证码 -->
-    <el-dialog v-model="imageDialogVisible" destroy-on-close title="登录到动漫花园" width="220">
+    <el-dialog align-center v-model="imageDialogVisible" destroy-on-close title="登录到动漫花园" width="220">
       <el-row>
         <img :src="imgSrc" style="width: 100px; margin-right: 10px;" />
         <el-button link type="primary" size="small" @click="refreshImage">换一张</el-button>
@@ -107,7 +122,7 @@
       </el-row>
     </el-dialog>
     <!-- reCaptcha验证码 -->
-    <el-dialog v-model="reCaptchaDialogVisible_nyaa" destroy-on-close title="登录到Nyaa" width="360">
+    <el-dialog align-center v-model="reCaptchaDialogVisible_nyaa" destroy-on-close title="登录到Nyaa" width="360">
       <el-row>
         <iframe src="https://nyaa.si/grecaptcha" style="height: 500px;width: 350px;"></iframe>
       </el-row>
@@ -116,23 +131,18 @@
         <el-button type="primary" @click="submitCaptcha('nyaa'); reCaptchaDialogVisible_nyaa = false">确认</el-button>
       </el-row>
     </el-dialog>
-    <el-dialog v-model="reCaptchaDialogVisible_acgnx_g" destroy-on-close title="登录到AcgnX" width="360">
-      <el-row>
-        <iframe src="https://www.acgnx.se/grecaptcha" style="height: 500px;width: 350px;"></iframe>
-      </el-row>
-      <el-row style="height: 20px;" />
-      <el-row>
-        <el-button type="primary" @click="submitCaptcha('acgnx_g'); reCaptchaDialogVisible_acgnx_g = false">确认</el-button>
-      </el-row>
+    <!-- cloudflare-turnstile验证 -->
+    <el-dialog :z-index="3000" align-center v-model="turnstileDialogVisible_acgnx_g" destroy-on-close title="登录到AcgnX" width="360" 
+      @opened="setTurnstilePosition('acgnx_g')" @close="removeValidation">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <div ref="turnstileValidation_acgnx_g" style="width: 300px; height: 65px;">cloudflare-turnstile</div>
+      </div>
     </el-dialog>
-    <el-dialog v-model="reCaptchaDialogVisible_acgnx_a" destroy-on-close title="登录到末日动漫" width="360">
-      <el-row>
-        <iframe src="https://share.acgnx.se/grecaptcha" style="height: 500px;width: 350px;"></iframe>
-      </el-row>
-      <el-row style="height: 20px;" />
-      <el-row>
-        <el-button type="primary" @click="submitCaptcha('acgnx_a'); reCaptchaDialogVisible_acgnx_a = false">确认</el-button>
-      </el-row>
+    <el-dialog :z-index="3001" align-center v-model="turnstileDialogVisible_acgnx_a" destroy-on-close title="登录到末日动漫" width="360" 
+      @opened="setTurnstilePosition('acgnx_a')" @close="removeValidation">
+      <div style="display: flex; justify-content: center; align-items: center;">
+        <div ref="turnstileValidation_acgnx_a" style="width: 300px; height: 65px;">cloudflare-turnstile</div>
+      </div>
     </el-dialog>
     <el-container style="height: 100%">
       <!-- 标题栏 -->

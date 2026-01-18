@@ -24,21 +24,33 @@ declare namespace Message {
       content: string
     }
 
+    interface ConfigName {
+      name: string
+    }
+
   }
 
   namespace BT {
 
-    interface ReCaptchaType {
+    interface ValidationType {
       type: 'nyaa' | 'acgnx_a' | 'acgnx_g'
     }
+
+    interface TurnstilePosition {
+      x: number
+      y: number
+    }
+
+    type AcgnXAPIConfig = Config.AcgnXAPIConfig
 
     interface AccountType {
       type: string
     }
 
-    interface Captcha {
+    interface ValidationInfo {
       type: string
-      key: string
+      key?: string
+      position?: TurnstilePosition
     }
 
     interface LoginStatus {

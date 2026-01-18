@@ -1,6 +1,10 @@
 <script setup lang="ts" name="Modify">
-    import { onMounted, ref, computed, reactive } from "vue"
+    import { onMounted, ref, computed, reactive, watch } from "vue"
+    import { useDark } from '@vueuse/core'
     import { Edit, View, CopyDocument, Link, Search, RefreshRight, Upload } from '@element-plus/icons-vue'
+    import { Codemirror } from 'vue-codemirror'
+    import { html } from '@codemirror/lang-html'
+    import { oneDark } from '@codemirror/theme-one-dark'
     import { marked } from 'marked'
     import bbobHTML from '@bbob/html'
     import presetHTML5 from '@bbob/preset-html5'
@@ -16,6 +20,16 @@
         setHeight()
         window.onresize = setHeight
     }
+
+    //编辑器设置
+    const isDark = useDark()
+    let extensions
+    function changeTheme() {
+        if (isDark.value)
+            extensions = [html(), oneDark]
+        else extensions = [html()]
+    }
+    watch(isDark, changeTheme)
 
     //设置表格数据
     let siteName = {
@@ -320,6 +334,7 @@
     const isLoading = ref(true)
     onMounted(() => {
         setscrollbar()
+        changeTheme()
         loadData()
     })
 </script>
@@ -331,7 +346,7 @@
     <el-dialog v-model="isEditing" width="900" :title="dialogTitle" @closed="resetDialog">
         <div v-loading="isLoadingContent">
             <el-input style="margin-bottom: 20px;" v-model="title" />
-            <el-input type="textarea" :autosize="{minRows:20}" v-model="content" />
+            <codemirror v-model="content" :style="{ minHeight: '400px', width: '100%' }" placeholder="请填写发布内容" :extensions="extensions" />
             <div style="margin-top: 10px;" v-if="isMultiEdit">
                 <span>批量修改时仅支持html形式的发布稿</span>
                 <span>

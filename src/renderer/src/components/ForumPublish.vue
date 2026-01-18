@@ -1,6 +1,10 @@
 <script setup lang="ts" name="ForumPublish">
-    import { onMounted, ref } from "vue"
+    import { onMounted, ref, watch } from "vue"
+    import { useDark } from '@vueuse/core'
     import { useRouter } from 'vue-router'
+    import { Codemirror } from 'vue-codemirror'
+    import { html } from '@codemirror/lang-html'
+    import { oneDark } from '@codemirror/theme-one-dark'
     import { Upload, Search, View, Edit } from '@element-plus/icons-vue'
 
     const props = defineProps<{id: number}>()
@@ -62,6 +66,16 @@
         },
     ]
 
+    //编辑器设置
+    const isDark = useDark()
+    let extensions
+    function changeTheme() {
+        if (isDark.value)
+            extensions = [html(), oneDark]
+        else extensions = [html()]
+    }
+    watch(isDark, changeTheme)
+
     //添加Credit信息
     function addCredit() {
         if (credit_link.value == '') return
@@ -86,7 +100,7 @@
     function addLinks() {
         if (oldLinks.value == '') return
         if (!content.value.includes('请将旧链放于此')) return
-        content.value = content.value.replace('请将旧链放于此', oldLinks.value)
+        content.value = content.value.replace('请将旧链放于此', oldLinks.value.replace(/(<a[\s\S]*?<\/a>)/g, '<del>$1</del>'))
         ElMessage({
             message: '添加旧链成功',
             type: 'success'
@@ -109,7 +123,7 @@
         let content: string = ''
         for (let i = 0; i < 6; i++) {
             let link = publishInfo.value[i].split('：')[1]
-            if (link != '未找到链接')
+            if (link != '未找到链接' && link != 'undefined')
                 content += `<a href="${link}">${link}</a>\n\n`
         }
         return content
@@ -145,7 +159,6 @@
             oldLinks.value = ''
             if (links) {
                 links.forEach((_item, index) => {
-                    links[index] = links[index].replace(/(\s)(<a[\s\S]*?<\/a>)(\s)/g, '$1<del>$2</del>$3')
                     oldLinks.value += links[index]
                     if (index < links.length - 1)
                         oldLinks.value += '\n\n'
@@ -238,6 +251,8 @@
         }
         if (result == 'empty')
             ElMessage.error('标题或内容为空')
+        else if (result == 'forbidden') 
+            ElMessage.error('防火墙阻止')
         else if (result == 'unauthorized') 
             ElMessage.error('认证失败，请检查账号密码')
         else if (result == 'failed')
@@ -301,6 +316,7 @@
 
     onMounted(async () => {
         setscrollbar()
+        changeTheme()
         await loadData()
         let message: Message.Task.TaskStatus = { id: props.id, step: 'forum_publish' }
         window.taskAPI.setTaskProcess(JSON.stringify(message))
@@ -396,7 +412,7 @@
                                 </span>
                                 <el-dialog v-model="editContent" width="900" title="查看和编辑发布稿">
                                     <div v-loading="isPublishing">
-                                        <el-input v-model="content" :autosize="{minRows:20}" type="textarea" placeholder="主站发布稿" />
+                                        <codemirror v-model="content" :style="{ minHeight: '400px' }" placeholder="主站发布稿" :extensions="extensions" />
                                         <div class="title"><el-button size="large" style="margin-top: 20px;" type="primary" @click="submit">确认并继续发布</el-button></div>
                                     </div>
                                 </el-dialog>
@@ -429,7 +445,7 @@
                                 <el-button link @click="addMediaInfo()" :icon="Edit" >添加MediaInfo</el-button>
                             </el-row>
                             <el-dialog v-model="editMediaInfo" width="900" title="查看和编辑MediaInfo">
-                                <el-input v-model="mediaInfo" :autosize="{minRows:20}" type="textarea" placeholder="请填写MediaInfo" />
+                                <codemirror v-model="mediaInfo" :style="{ minHeight: '400px' }" placeholder="请填写MediaInfo" :extensions="extensions" />
                             </el-dialog>
                             <el-row v-if="isRS">
                                 <h3>RS旧链：</h3>

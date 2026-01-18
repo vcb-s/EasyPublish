@@ -18,6 +18,7 @@ declare namespace Config {
     status: 'published' | 'publishing'
     step: 'edit' | 'check' | 'bt_publish' | 'forum_publish' | 'finish'
   }
+
   type LoginInfo = {
     name: string, 
     time: string, 
@@ -27,13 +28,29 @@ declare namespace Config {
     enable: boolean,
     cookies: Cookie[]
   }
+
+  interface AcgnXAPIConfig {
+    enable: boolean
+    asia: {
+      uid: string
+      token: string
+    }
+    global: {
+      uid: string
+      token: string
+    }
+  }
+
   type TaskData = {
     tasks: Task[]
   }
+
   type UserData = {
     info: LoginInfo[]
+    name?: string
+    acgnxAPI?: AcgnXAPIConfig
     proxyConfig: ProxyConfig
-    forum: {username: string, password: string}
+    forum: {username: string, password: string, cookies?: Cookie[]}
   }
 
   interface ProxyConfig{

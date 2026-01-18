@@ -1,24 +1,48 @@
 <script setup lang="ts" name="Edit">
-    import { onMounted, ref, reactive, computed } from "vue"
+    import { onMounted, ref, reactive, computed, watch } from "vue"
+    import { useDark } from '@vueuse/core'
     import { useRouter } from 'vue-router'
     import { Edit } from '@element-plus/icons-vue'
+    import { Codemirror } from 'vue-codemirror'
+    import { html as codemirror_html } from '@codemirror/lang-html'
+    import { markdown as codemirror_md } from '@codemirror/lang-markdown'
+    import { oneDark } from '@codemirror/theme-one-dark'
     import type { FormRules } from 'element-plus'
 
     const props = defineProps<{id: number}>()
     const router = useRouter()
 
-    //设置参与制作者表单验证
-    const checkMembers = (_rules, _value, callback) => {
-        if (config.script != '' &&
-        config.encode != '' &&
-        config.collate != '' &&
-        config.upload != ''
-        ) {
-            callback()
+    //编辑器设置
+    const isDark = useDark()
+    let extensions_html
+    let extensions_md
+    let extensions_bbcode
+    function changeTheme() {
+        if (isDark.value) {
+            extensions_html = [codemirror_html(), oneDark]
+            extensions_md = [codemirror_md(), oneDark]
+            extensions_bbcode = [oneDark]
         }
-        else
-            callback(new Error('请填写参与制作者'))
+        else {
+            extensions_html = [codemirror_html()]
+            extensions_md = [codemirror_md()]
+            extensions_bbcode = []
+        }
     }
+    watch(isDark, changeTheme)
+
+    //设置参与制作者表单验证
+    // const checkMembers = (_rules, _value, callback) => {
+    //     if (config.script != '' &&
+    //     config.encode != '' &&
+    //     config.collate != '' &&
+    //     config.upload != ''
+    //     ) {
+    //         callback()
+    //     }
+    //     else
+    //         callback(new Error('请填写参与制作者'))
+    // }
     //设置对比图表单验证
     const checkComparisons_html = (_rules, _value, callback) => {
         if (config.comparisons_html == '')
@@ -204,11 +228,11 @@
             message: '请填写Nyaa Information，默认https://vcb-s.com/archives/138',
             trigger: 'change'
         }],
-        script: [{
-            required: true,
-            validator: checkMembers,
-            trigger: 'blur'
-        }],
+        // script: [{
+        //     required: false,
+        //     validator: checkMembers,
+        //     trigger: 'blur'
+        // }],
         path_md: [{
             message: '请选择Nyaa描述文件',
             trigger: 'change'
@@ -435,7 +459,7 @@
                 audio_out_C += '评论音轨' + ' + '
                 audio_out_E += 'commentary tracks' + ' + '
             }
-            if (item == 5) {
+            if (item == 6) {
                 audio_out_C += '无障碍音轨' + ' + '
                 audio_out_E += 'audio description' + ' + '
             }
@@ -682,6 +706,8 @@
     }
     //生成发布配置
     async function generateConfig() {
+        var p1 = /([A-Za-z0-9_])([\u4e00-\u9fa5]+)/gi
+        var p2 = /([\u4e00-\u9fa5]+)([A-Za-z0-9_])/gi
         if (taskType.value == 'template') {
             if (!config.prefill) {
                 config.imageCredit = ''
@@ -714,7 +740,7 @@
                     sub_EN: config.sub_EN.trim(),
                     audio_CN: config.audio_CN.trim(),
                     audio_EN: config.audio_EN.trim(),
-                    comment_CN: config.comment_CN.trim(),
+                    comment_CN: config.comment_CN.trim().replace(p1, "$1 $2").replace(p2, "$1 $2"),
                     comment_EN: config.comment_EN.trim(),
                     rsVersion: config.rsVersion,
                     rsComment_CN: config.rsComment_CN.trim(),
@@ -882,6 +908,7 @@
 
     onMounted(async () => {
         setscrollbar()
+        changeTheme()
         let message: Message.Task.TaskStatus = { id: props.id, step: 'edit' }
         window.taskAPI.setTaskProcess(JSON.stringify(message))
         await getTaskInfo()
@@ -1025,7 +1052,8 @@
                             <el-form-item v-if="config.prefill" label="MediaInfo">
                                 <el-button link type="primary" @click="editMediaInfo = !editMediaInfo" :icon="Edit">编辑MediaInfo</el-button>
                                 <el-dialog v-model="editMediaInfo" width="900" title="编辑MediaInfo">
-                                    <el-input v-model="config.mediaInfo" type="textarea" :autosize="{minRows: 25}" placeholder="填写MediaInfo" />
+                                    <codemirror v-model="config.mediaInfo" :style="{ minHeight: '400px' }" 
+                                        placeholder="请填写MediaInfo" :extensions="extensions_bbcode" />
                                 </el-dialog>
                             </el-form-item>
                             <el-form-item label="参与制作" prop="script">
@@ -1047,7 +1075,7 @@
                             </el-form-item>
                             <el-form-item label="资源提供者">
                                 <el-input v-model="config.providers" type="textarea" :autosize="{minRows: 3}" 
-                                :placeholder="'BD: XXXX@XXXX...\nSCAN: XXXX@XXXX...\nCD: XXXX@XXXX...'" />
+                                :placeholder="'BDs: XXXX@XXXX...\nCDs: XXXX@XXXX...\nScans: XXXX@XXXX...'" />
                             </el-form-item>
                             <el-form-item v-if="!config.reseed" label="对比图">
                                 <el-button link type="primary" @click="editComparisons = !editComparisons" :icon="Edit">编辑对比图</el-button>
@@ -1067,16 +1095,16 @@
                                         </span>
                                     </div>
                                     <el-form-item v-show="urlType == 'html'" prop="comparisons_html">
-                                        <el-input v-model="config.comparisons_html" type="textarea" :autosize="{minRows: 15}" 
-                                        :placeholder="'<p>Comparison (right click on the image and open it in a new tab to see the full-size one)<br/>........'" />
+                                        <codemirror v-model="config.comparisons_html" :style="{ minHeight: '400px', width: '100%' }" :extensions="extensions_html"
+                                            placeholder="<p>Comparison (right click on the image and open it in a new tab to see the full-size one)<br/>........" />
                                     </el-form-item>
                                     <el-form-item v-show="urlType == 'md'" prop="comparisons_md">
-                                        <el-input v-model="config.comparisons_md" type="textarea" :autosize="{minRows: 15}" 
-                                        :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                                        <codemirror v-model="config.comparisons_md" :style="{ minHeight: '400px', width: '100%' }" :extensions="extensions_md"
+                                            placeholder="Comparison (right click on the image and open it in a new tab to see the full-size one)........" />
                                     </el-form-item>
                                     <el-form-item v-show="urlType == 'bbcode'" prop="comparisons_bbcode">
-                                        <el-input v-model="config.comparisons_bbcode" type="textarea" :autosize="{minRows: 15}" 
-                                        :placeholder="'Comparison (right click on the image and open it in a new tab to see the full-size one)........'" />
+                                        <codemirror v-model="config.comparisons_bbcode" :style="{ minHeight: '400px', width: '100%' }" :extensions="extensions_bbcode"
+                                            placeholder="Comparison (right click on the image and open it in a new tab to see the full-size one)........" />
                                     </el-form-item>
                                 </el-dialog>
                             </el-form-item>
