@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, session, clipboard, net, Session } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, session, clipboard, net, Session, WebContentsView } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import fs from 'fs'
@@ -14,7 +14,6 @@ import html2md from 'turndown'
 import CryptoJS from 'crypto-js'
 
 //静态资源
-import acgnxResponse from '../renderer/src/assets/acgnx.html?asset'
 import nyaaResponse from '../renderer/src/assets/nyaa.html?asset'
 import appIcon from '../../build/icon.ico?asset'
 
@@ -52,7 +51,19 @@ const defaultUserData: Config.UserData = {
     host: '',
     port: 8080,
   },
-  forum: {username: '', password: ''},
+  name: 'default',
+  acgnxAPI: {
+    enable: false,
+    asia: {
+      uid: '',
+      token: ''
+    },
+    global: {
+      uid: '',
+      token: ''
+    }
+  },
+  forum: { username: '', password: '', cookies: [] },
   info: [
     {
       name: 'bangumi',
@@ -161,9 +172,15 @@ const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 
 axios.interceptors.request.use(
   config => {
     let type = ''
+    config.headers['User-Agent'] = userAgent
     if (config.url!.includes('vcb-s.com')) {
       let key = "Basic " + btoa(userDB.data.forum.username + ':' + userDB.data.forum.password)
       config.headers['Authorization'] = key
+      let str = ''
+      let cookies = userDB.data.forum.cookies
+      if (cookies)
+      cookies.forEach(item => { str += `${item.name}=${item.value}; ` })
+      config.headers['Cookie'] = str
       return config
     }
     else if (config.url!.includes('bangumi.moe')) type = 'bangumi'
@@ -201,7 +218,9 @@ axiosRetry(axios, {
   主窗口设置
 */
 
-let mainWindowWebContent: Electron.WebContents //暴露主窗口上下文，用于刷新页面
+let mainWindowWebContent: Electron.WebContents //主窗口上下文，用于刷新页面
+let mainWindowContentView: Electron.View //用于显示turnstile
+let window: BrowserWindow //改变窗体大小
 function createWindow(): void {
   
   const partition = 'persist:main' //隔离窗口缓存
@@ -221,6 +240,9 @@ function createWindow(): void {
     icon: appIcon,
   })
   mainWindowWebContent = mainWindow.webContents
+  mainWindowContentView = mainWindow.contentView
+  window = mainWindow
+  
   const ses = session.fromPartition(partition)
 
   /*
@@ -232,12 +254,6 @@ function createWindow(): void {
       const {host, pathname} = new URL(req.url)
       if (pathname == '/grecaptcha' && host == 'nyaa.si') {
         const data = fs.readFileSync(nyaaResponse, {encoding: 'utf-8'})
-        return new Response(data, {
-          headers: { 'content-type': 'text/html' }
-        })
-      }
-      else if (pathname == '/grecaptcha' && host.includes('acgnx')) {
-        const data = fs.readFileSync(acgnxResponse, {encoding: 'utf-8'})
         return new Response(data, {
           headers: { 'content-type': 'text/html' }
         })
@@ -265,6 +281,7 @@ function createWindow(): void {
     else if (details.url.includes('share.acgnx.se')) type = 'acgnx_a'
     else if (details.url.includes('www.acgnx.se')) type = 'acgnx_g'
     else {
+      details.requestHeaders['user-agent'] = userAgent
       callback({ requestHeaders: details.requestHeaders })
       return
     }
@@ -274,7 +291,7 @@ function createWindow(): void {
       str += `${item.name}=${item.value}; `
     })
     details.requestHeaders['Cookie'] = str
-    details.requestHeaders['User-Agent'] = userAgent
+    details.requestHeaders['user-agent'] = userAgent
     callback({ requestHeaders: details.requestHeaders })
   })
   //设置代理
@@ -334,6 +351,11 @@ function createWindow(): void {
   }
 }
 
+//cloudflare-turnstile窗口设置
+let cfView: WebContentsView
+let cfViewVisible = false
+let cssKey: string[] = []
+
 /*
   登录窗口设置
 */
@@ -346,9 +368,10 @@ async function createLoginWindow(type: string) {
   else if (type == 'acgrip') url = 'https://acg.rip/users/sign_in'
   else if (type == 'dmhy') url = 'https://www.dmhy.org/user'
   else if (type == 'acgnx_g') url = 'https://www.acgnx.se/user.php?o=login'
-  else url = 'https://share.acgnx.se/user.php?o=login'
+  else if (type == 'acgnx_a') url = 'https://share.acgnx.se/user.php?o=login'
+  else url = 'https://vcb-s.com'
 
-  const partition = 'persist:login' //隔离窗口缓存
+  const partition = 'persist:' + userDB.data.name //隔离窗口缓存
   let ses = session.fromPartition(partition)
 
   //获取并保存cookie信息
@@ -381,14 +404,25 @@ async function createLoginWindow(type: string) {
     loginWindow.show()
   })
   
-  loginWindow.on('close', async (e) => {
+  loginWindow.on('close', async event => {
     try{
-      e.preventDefault()
-      //保存cookie并检查登录状态
-      await setCookies(type, url)
-      await BT.checkLoginStatus(JSON.stringify({type}))
-      //告知页面刷新数据
-      mainWindowWebContent.send('BT_refreshLoginData')
+      event.preventDefault()
+      if (type == 'vcb') {
+        await ses.cookies.get({url: url}).then((cookies) => {
+          userDB.data.forum.cookies = cookies
+        }).catch(err => {log.error(err)})
+        await ses.cookies.get({name: 'cf_clearance'}).then((cookies) => {
+          userDB.data.forum.cookies!.push(...cookies)
+        }).catch(err => {log.error(err)})
+        await userDB.write()
+      }
+      else{
+        //保存cookie并检查登录状态
+        await setCookies(type, url)
+        await BT.checkLoginStatus(JSON.stringify({type}))
+        //告知页面刷新数据
+        mainWindowWebContent.send('BT_refreshLoginData')
+      }
     }
     catch(err){
       log.error(err)
@@ -400,7 +434,7 @@ async function createLoginWindow(type: string) {
 
   //拦截设置useragent
   ses.webRequest.onBeforeSendHeaders((details, callback) => {
-    details.requestHeaders['User-Agent'] = userAgent
+    details.requestHeaders['user-agent'] = userAgent
     callback({ requestHeaders: details.requestHeaders })
   })
   //配置代理
@@ -493,9 +527,49 @@ namespace Global {
     let reader = new commonmark.Parser()
     let writer = new md2bbc.BBCodeRenderer()
     let parsed = reader.parse(md.replaceAll('\n* * *', ''))
-    let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
+    let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/g, '[img]')
     let result: Message.Global.FileContent = { content: bbcode }
     return JSON.stringify(result)
+  }
+
+  //配置名称
+  export async function getConfigName() {
+    let name = userDB.data.name
+    if (!name) name = 'default'
+    let msg: Message.Global.ConfigName = { name }
+    return JSON.stringify(msg)
+  }
+  export async function setConfigName(msg: string) {
+    let { name }: Message.Global.ConfigName = JSON.parse(msg)
+    userDB.data.name = name
+    await userDB.write()
+  }
+  //更换配置文件
+  export async function changeConfig() {
+    await userDB.write()
+    if (!fs.existsSync(`${app.getPath('userData')}\\configs`))
+      fs.mkdirSync(`${app.getPath('userData')}\\configs`)
+    fs.copyFileSync(app.getPath('userData') + '\\easypublish-user-db.json', `${app.getPath('userData')}\\configs\\${userDB.data.name}.json`)
+    fs.rmSync(app.getPath('userData') + '\\easypublish-user-db.json')
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      properties: ['openFile'], 
+      filters: [{name: 'JSON', extensions: ['json']}],
+      defaultPath: `${app.getPath('userData')}\\configs`
+    })
+    if (canceled) return
+    fs.copyFileSync(filePaths[0], app.getPath('userData') + '\\easypublish-user-db.json')
+    app.relaunch()
+    app.exit()
+  }
+  //使用新配置文件启动
+  export async function createConfig() {
+    await userDB.write()
+    if (!fs.existsSync(`${app.getPath('userData')}\\configs`))
+      fs.mkdirSync(`${app.getPath('userData')}\\configs`)
+    fs.copyFileSync(app.getPath('userData') + '\\easypublish-user-db.json', `${app.getPath('userData')}\\configs\\${userDB.data.name}.json`)
+    fs.rmSync(app.getPath('userData') + '\\easypublish-user-db.json')
+    app.relaunch()
+    app.exit()
   }
 }
 
@@ -535,31 +609,37 @@ namespace BT {
             await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录')
-              loginBangumi(info)
+              if (info.username != '' && info.password != '') 
+                loginBangumi(info)
           }
           if (type == 'acgrip') {
             await checkAcgripLoginStatus(info)
             await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录')
-              loginAcgrip(info)
+              if (info.username != '' && info.password != '') 
+                loginAcgrip(info)
           }
           if (type == 'nyaa') {
             await checkNyaaLoginStatus(info)
             await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
-            if (info.status == '账号未登录'){
-              let msg: Message.BT.ReCaptchaType = { type: 'nyaa'}
-              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+            if (info.status == '账号未登录') {
+              if (info.username != '' && info.password != '') {
+                let msg: Message.BT.ValidationType = { type: 'nyaa' }
+                mainWindowWebContent.send('BT_loadValidation', JSON.stringify(msg))
+              }
             }
           }
           if (type == 'acgnx_a') {
             await checkAcgnxALoginStatus(info)
             await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
-            if (info.status == '账号未登录'){
-              let msg: Message.BT.ReCaptchaType = { type: 'acgnx_a'}
-              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+            if (info.status == '账号未登录') {
+              if (info.username != '' && info.password != '') {
+                let msg: Message.BT.ValidationType = { type: 'acgnx_a' }
+                mainWindowWebContent.send('BT_loadValidation', JSON.stringify(msg))
+              }
             }
           }
           if (type == 'acgnx_g') {
@@ -567,8 +647,10 @@ namespace BT {
             await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录'){
-              let msg: Message.BT.ReCaptchaType = { type: 'acgnx_g'}
-              mainWindowWebContent.send('BT_loadReCaptcha', JSON.stringify(msg))
+              if (info.username != '' && info.password != '') { 
+                let msg: Message.BT.ValidationType = { type: 'acgnx_g' }
+                mainWindowWebContent.send('BT_loadValidation', JSON.stringify(msg))
+              }
             }
           }
           if (type == 'dmhy') {
@@ -576,22 +658,24 @@ namespace BT {
             await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录'){
-              const result = await axios.get('https://www.dmhy.org/common/generate-captcha?code=' + Date.now())
-              //设置PHP_SESSION以保证验证码合法
-              if (result.headers['set-cookie']) {
-                result.headers['set-cookie']!.forEach(async item => {
-                  let cookie = item.split(';')[0]
-                  let index = cookie.indexOf('=')
-                  let name = cookie.slice(0, index)
-                  let value = cookie.slice(index + 1, cookie.length)
-                  await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
-                });
-                await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
-                  info.cookies.push(...cookies)
-                }).catch(err => {log.error(err)})
-                userDB.write()
+              if (info.username != '' && info.password != '') { 
+                const result = await axios.get('https://www.dmhy.org/common/generate-captcha?code=' + Date.now())
+                //设置PHP_SESSION以保证验证码合法
+                if (result.headers['set-cookie']) {
+                  result.headers['set-cookie']!.forEach(async item => {
+                    let cookie = item.split(';')[0]
+                    let index = cookie.indexOf('=')
+                    let name = cookie.slice(0, index)
+                    let value = cookie.slice(index + 1, cookie.length)
+                    await ses.cookies.set({url: 'https://www.dmhy.org', name: name, value: value, httpOnly: true, expirationDate: Date.now() + 31536000})
+                  });
+                  await ses.cookies.get({url: 'https://www.dmhy.org'}).then((cookies) => {
+                    info.cookies.push(...cookies)
+                  }).catch(err => {log.error(err)})
+                  userDB.write()
+                }
+                mainWindowWebContent.send('BT_loadIamgeCaptcha')
               }
-              mainWindowWebContent.send('BT_loadIamgeCaptcha')
             }
           }
         }
@@ -631,6 +715,7 @@ namespace BT {
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
+      info.status = '访问失败'
     }
   }
   async function checkNyaaLoginStatus(info: Config.LoginInfo) {
@@ -659,6 +744,7 @@ namespace BT {
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
+      info.status = '访问失败'
     }
   }
   async function checkAcgripLoginStatus(info: Config.LoginInfo) {
@@ -687,6 +773,7 @@ namespace BT {
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
+      info.status = '访问失败'
     }
   }
   async function checkDmhyLoginStatus(info: Config.LoginInfo) {
@@ -715,6 +802,7 @@ namespace BT {
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
+      info.status = '访问失败'
     }
   }
   async function checkAcgnxGLoginStatus(info: Config.LoginInfo) {
@@ -755,6 +843,7 @@ namespace BT {
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
+      info.status = '访问失败'
     }
   }
   async function checkAcgnxALoginStatus(info: Config.LoginInfo) {
@@ -795,21 +884,22 @@ namespace BT {
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
+      info.status = '访问失败'
     }
   }
 
   //登录BT账户
   export async function loginAccount(msg: string) {
-    let {type, key}: Message.BT.Captcha = JSON.parse(msg)
+    let {type, key, position }: Message.BT.ValidationInfo = JSON.parse(msg)
     let info = userDB.data.info.find(item => item.name == type)!
     if (type == 'nyaa')
-      loginNyaa(info, key)
+      loginNyaa(info, key!)
     if (type == 'acgnx_a')
-      loginAcgnxA(info, key)
+      loginAcgnxA(info, position!)
     if (type == 'acgnx_g')
-      loginAcgnxG(info, key)
+      loginAcgnxG(info, position!)
     if (type == 'dmhy')
-      loginDmhy(info, key)
+      loginDmhy(info, key!)
   }
   async function loginBangumi(info: Config.LoginInfo) {
     try {
@@ -992,13 +1082,38 @@ namespace BT {
       log.error(err)
     }
   }
-  async function loginAcgnxG(info: Config.LoginInfo, key: string) {
+  async function loginAcgnxG(info: Config.LoginInfo, position: Message.BT.TurnstilePosition) {
     try {
       info.time = getCurrentTime()
       info.status = '正在登录'
       await userDB.write()
       mainWindowWebContent.send('BT_refreshLoginData')
       let url = 'https://www.acgnx.se/user.php?o=login'
+      window.resizable = false
+      cfViewVisible = true
+      mainWindowContentView.addChildView(cfView)
+      cfView.webContents.loadURL(url)
+      cfView.setBounds({ x: position.x, y: position.y, width: 300, height: 65 })
+      let key: string = 'waiting'
+      let count = 20
+      while (key == 'waiting' && count > 0 && cfViewVisible) {
+        await sleep(1000)
+        cfView.webContents.executeJavaScript(`document.getElementsByName("form1")[0].querySelector("input[name='cf-turnstile-response']").value`).then(result => {
+          if (result) key = result
+          count--
+        }).catch(err => {console.log(err)})
+      }
+      mainWindowContentView.removeChildView(cfView)
+      window.resizable = true
+      cfViewVisible = false
+      mainWindowWebContent.send('BT_closeValidation')
+      if (key == 'waiting') {
+        info.time = getCurrentTime()
+        info.status = '验证未通过'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+        return
+      }
       const formData = new FormData()
       let uname = info.username
       let pwd = info.password
@@ -1007,7 +1122,7 @@ namespace BT {
       formData.append('emailaddress', uname)
       formData.append('password', pwd)
       formData.append('cookietime', '315360000')
-      formData.append('g-recaptcha-response', key)
+      formData.append('cf-turnstile-response', key)
       let response = await axios.post(url, formData, { responseType: 'text' })
       if (response.status == 302) {
         response.headers['set-cookie']!.forEach(async item => {
@@ -1039,13 +1154,38 @@ namespace BT {
       log.error(err)
     }
   }
-  async function loginAcgnxA(info: Config.LoginInfo, key: string) {
+  async function loginAcgnxA(info: Config.LoginInfo, position: Message.BT.TurnstilePosition) {
     try {
       info.time = getCurrentTime()
       info.status = '正在登录'
       await userDB.write()
       mainWindowWebContent.send('BT_refreshLoginData')
       let url = 'https://share.acgnx.se/user.php?o=login'
+      window.resizable = false
+      cfViewVisible = true
+      mainWindowContentView.addChildView(cfView)
+      cfView.webContents.loadURL(url)
+      cfView.setBounds({ x: position.x, y: position.y, width: 300, height: 65 })
+      let key = 'waiting'
+      let count = 20
+      while (key == 'waiting' && count > 0 && cfViewVisible) {
+        await sleep(1000)
+        cfView.webContents.executeJavaScript(`document.getElementsByName("form1")[0].querySelector("input[name='cf-turnstile-response']").value`).then(result => {
+          if (result) key = result
+          count--
+        }).catch(err => {console.log(err)})
+      }
+      mainWindowContentView.removeChildView(cfView)
+      window.resizable = true
+      cfViewVisible = false
+      mainWindowWebContent.send('BT_closeValidation')
+      if (key == 'waiting') {
+        info.time = getCurrentTime()
+        info.status = '验证未通过'
+        await userDB.write()
+        mainWindowWebContent.send('BT_refreshLoginData')
+        return
+      }
       const formData = new FormData()
       let uname = info.username
       let pwd = info.password
@@ -1054,7 +1194,7 @@ namespace BT {
       formData.append('emailaddress', uname)
       formData.append('password', pwd)
       formData.append('cookietime', '315360000')
-      formData.append('g-recaptcha-response', key)
+      formData.append('cf-turnstile-response', key)
       let response = await axios.post(url, formData, { responseType: 'text' })
       if (response.status == 302) {
         response.headers['set-cookie']!.forEach(async item => {
@@ -1085,6 +1225,11 @@ namespace BT {
     catch (err) {
       log.error(err)
     }
+  }
+  export async function removeValidation() {
+    window.resizable = true
+    cfViewVisible = false
+    mainWindowContentView.removeChildView(cfView)
   }
 
   //打开登录窗口
@@ -1120,7 +1265,7 @@ namespace BT {
 
   //清除登录状态
   export async function clearStorage() {
-    const partition = 'persist:login'
+    const partition = 'persist:' + userDB.data.name
     let ses = session.fromPartition(partition)
     await ses.clearStorageData()
     userDB.data.info.forEach((item) =>{
@@ -1128,6 +1273,16 @@ namespace BT {
     })
     await userDB.write()
     mainWindowWebContent.send('BT_refreshLoginData')
+  }
+
+  //Acgnx API设置
+  export async function getAcgnXAPIConfig() {
+    return JSON.stringify(userDB.data.acgnxAPI)
+  }
+  export async function saveAcgnXAPIConfig(msg: string) {
+    let config: Message.BT.AcgnXAPIConfig = JSON.parse(msg)
+    userDB.data.acgnxAPI = config
+    await userDB.write()
   }
 
   //导入导出Cookies
@@ -1321,7 +1476,6 @@ namespace BT {
       let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
       const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
       const formData = new FormData()
-      formData.append('op', 'upload')
       if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
         formData.append('sort_id', '2')
       else if (config.category_bangumi == '549ef207fe682f7549f1ea90')
@@ -1330,11 +1484,42 @@ namespace BT {
       formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
       formData.append('title', config.title)
       formData.append('intro', html)
+      formData.append('Anonymous_Post', '0')
+      formData.append('Team_Post', '1')
+      //先尝试API发布
+      if (userDB.data.acgnxAPI && userDB.data.acgnxAPI.enable) {
+        formData.append('uid', userDB.data.acgnxAPI.asia.uid)
+        formData.append('api_token', userDB.data.acgnxAPI.asia.token)
+        formData.append('mod', 'upload')
+        const response = await axios.post('https://share.acgnx.se/user.php?o=api&op=upload', formData, { responseType: 'json' })
+        if (response.data.code == 200) {
+          task.acgnx_a = 'https://share.acgnx.se/show-' + response.data.infohash +'.html'
+          await taskDB.write()
+          return 'success'
+        }
+        else if (response.data.code == 302) {
+          task.acgnx_a = 'https://share.acgnx.se/show-' + response.data.infohash +'.html'
+          await taskDB.write()
+          return 'exist'
+        }
+        else if (response.data.code == 105) {
+          log.error('末日动漫：認證失敗，api token與uid不匹配')
+          if (userDB.data.info.find(item => item.name == 'acgnx_a')!.status != '账号已登录')
+            return 'unauthorized'
+        }
+        else {
+          log.error(response)
+          if (userDB.data.info.find(item => item.name == 'acgnx_a')!.status != '账号已登录')
+            return 'failed'
+        }
+      }
+      formData.delete('uid')
+      formData.delete('api_token')
+      formData.delete('mod')
+      formData.append('op', 'upload')
       formData.append('emule_resource', '')
       formData.append('synckey', '')
       formData.append('discuss_url', '')
-      formData.append('Anonymous_Post', '0')
-      formData.append('Team_Post', '1')
       const response = await axios.post('https://share.acgnx.se/user.php?o=upload', formData, { responseType: 'text' })
       if (response.status != 200) throw response
       if ((response.data as string).includes('恭喜，資源發佈成功')) {
@@ -1365,7 +1550,6 @@ namespace BT {
       let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
       const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
       const formData = new FormData()
-      formData.append('op', 'upload')
       if (config.category_nyaa == '1_2') 
         formData.append('sort_id', '2')
       else if (config.category_nyaa == '1_3')
@@ -1380,12 +1564,43 @@ namespace BT {
       formData.append('bt_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
       formData.append('title', config.title)
       formData.append('intro', html)
+      formData.append('Anonymous_Post', '0')
+      formData.append('Team_Post', '1')
+      //先尝试API发布
+      if (userDB.data.acgnxAPI && userDB.data.acgnxAPI.enable) {
+        formData.append('uid', userDB.data.acgnxAPI.global.uid)
+        formData.append('api_token', userDB.data.acgnxAPI.global.token)
+        formData.append('mod', 'upload')
+        const response = await axios.post('https://www.acgnx.se/user.php?o=api&op=upload', formData, { responseType: 'json' })
+        if (response.data.code == 200) {
+          task.acgnx_a = 'https://www.acgnx.se/show-' + response.data.infohash +'.html'
+          await taskDB.write()
+          return 'success'
+        }
+        else if (response.data.code == 302) {
+          task.acgnx_a = 'https://www.acgnx.se/show-' + response.data.infohash +'.html'
+          await taskDB.write()
+          return 'exist'
+        }
+        else if (response.data.code == 105) {
+          log.error('AcgnX：認證失敗，api token與uid不匹配')
+          if (userDB.data.info.find(item => item.name == 'acgnx_g')!.status != '账号已登录')
+            return 'unauthorized'
+        }
+        else {
+          log.error(response)
+          if (userDB.data.info.find(item => item.name == 'acgnx_g')!.status != '账号已登录')
+            return 'failed'
+        }
+      }
+      formData.delete('uid')
+      formData.delete('api_token')
+      formData.delete('mod')
+      formData.append('tos', '1')
       formData.append('emule_resource', '')
       formData.append('synckey', '')
       formData.append('discuss_url', '')
-      formData.append('tos', '1')
-      formData.append('Anonymous_Post', '0')
-      formData.append('Team_Post', '1')
+      formData.append('op', 'upload')
       const response = await axios.post('https://www.acgnx.se/user.php?o=upload', formData, { responseType: 'text' })
       if (response.status != 200) throw response
       if ((response.data as string).includes('Congratulations, upload success')) {
@@ -2094,6 +2309,10 @@ namespace Forum {
     let { title }: Message.Forum.Title = JSON.parse(msg)
     let result: Message.Forum.Posts = { posts: [] }
     const response = await axios.get('https://vcb-s.com/wp-json/wp/v2/posts?context=edit&search=' + title, { responseType: 'json' })
+    if (response.status == 403) {
+      createLoginWindow('vcb')
+      throw new Error('防火墙阻止')
+    }
     if (response.data.status == 401)
       throw new Error('主站认证失败')
     response.data.forEach(item => {
@@ -2109,7 +2328,7 @@ namespace Forum {
 
   //主站发布
   export async function publish(msg: string) {
-    let message: Message.Task.Result = { result: ''}
+    let message: Message.Task.Result = { result: '' }
     try {
       let config: Message.Forum.PublishConfig = JSON.parse(msg)
       if (!fs.existsSync(config.imagePath)) {
@@ -2120,6 +2339,11 @@ namespace Forum {
       let imageData = new FormData()
       imageData.append('file', new Blob([img]), config.imagePath.replace(/^.*[\\\/]/, ''))
       const result = await axios.post('https://vcb-s.com/wp-json/wp/v2/media', imageData, { responseType: 'json' })
+      if (result.status == 403) {
+        message.result = 'forbidden'
+        createLoginWindow('vcb')
+        return JSON.stringify(message)
+      }
       if (result.status == 401) {
         message.result = 'unauthorized'
         return JSON.stringify(message)
@@ -2163,6 +2387,11 @@ namespace Forum {
         content: config.content,
       }
       const response = await axios.patch('https://vcb-s.com/wp-json/wp/v2/posts/' + config.rsID, data, {responseType: 'json'})
+      if (response.status == 403) {
+        message.result = 'forbidden'
+        createLoginWindow('vcb')
+        return JSON.stringify(message)
+      }
       if (response.status == 200) {
         taskDB.data.tasks.find((item) => item.id == config.id)!.forumLink = response.data.link
         message.result = 'success'
@@ -2473,7 +2702,10 @@ namespace Task {
       content += `<img src="${info.posterUrl}" alt="${info.posterUrl.replace(/^.*[\\\/]/, '')}" /><br />\n<br />\n`
       let note = ''
       if (info.note)
-        info.note.forEach(item => { note += item + ' + ' })
+        info.note.forEach(item => { 
+          if (item != 'MOVIE')
+            note += item + ' + ' 
+        })
       if (note != '')
         note = note.slice(0, -2)
       let reseed = info.reseed ? ` Reseed${info.rsVersion > 1 ? ` v${info.rsVersion}` : ''}` : ''
@@ -2515,9 +2747,7 @@ namespace Task {
         content += `这个项目与 ${team_CN} 合作，感谢他们精心制作的字幕。<br />\n`
         content += `This project is in collaboration with ${team_EN}. Thanks to them for crafting Chinese subtitles.<br />\n<br />\n`
       }
-      var p1=/([A-Za-z0-9_])([\u4e00-\u9fa5]+)/gi;
-      var p2=/([\u4e00-\u9fa5]+)([A-Za-z0-9_])/gi;
-      let comment_CN = info.comment_CN.replace(p1, "$1 $2").replace(p2, "$1 $2").split('\n')
+      let comment_CN = info.comment_CN.split('\n')
       let comment_EN = info.comment_EN.split('\n')
       for (let i = 0; i <comment_CN.length; i++){
         content += comment_CN[i] + '<br />\n'
@@ -2583,7 +2813,7 @@ namespace Task {
       let reader = new commonmark.Parser()
       let bbcodeWriter = new md2bbc.BBCodeRenderer()
       let parsed_bbcode = reader.parse((md as string).replaceAll('\n* * *', ''))
-      let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
+      let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\s\S]*?"\]/g, '[img]')
       let html = content
       // if (!info.reseed) {
       //   md += '\n\n' +  info.comparisons_md
@@ -2698,9 +2928,10 @@ app.whenReady().then(async () => {
   await userDB.write()
   await taskDB.write()
   //获取登录窗口回话
-  BT.ses = session.fromPartition('persist:login')
+  BT.ses = session.fromPartition('persist:' + userDB.data.name)
   //注册IPC通信
   ipcMain.handle('global_getProxyConfig', _event => Global.getProxyConfig())
+  ipcMain.handle('global_getConfigName', _event => Global.getConfigName())
   ipcMain.handle('global_getFilePath', (_event, msg) => Global.getFilePath(msg))
   ipcMain.handle('global_getFolderPath', _event => Global.getFolderPath())
   ipcMain.handle('global_readFileContent', _event => Global.readFileContent())
@@ -2709,6 +2940,7 @@ app.whenReady().then(async () => {
   ipcMain.handle('BT_getTorrentList', _event => BT.getTorrentList())
   ipcMain.handle('BT_checkLoginStatus', (_event, msg) => BT.checkLoginStatus(msg))
   ipcMain.handle('BT_getAccountInfo', (_event, msg) => BT.getAccountInfo(msg))
+  ipcMain.handle('BT_getAcgnXAPIConfig', _event => BT.getAcgnXAPIConfig())
   ipcMain.handle('BT_publish', (_event, msg) => BT.publish(msg))
   ipcMain.handle('BT_getBangumiTags', (_event, msg) => BT.getBangumiTags(msg))
   ipcMain.handle('BT_searchBangumiTags', (_event, msg) => BT.searchBangumiTags(msg))
@@ -2733,12 +2965,17 @@ app.whenReady().then(async () => {
   ipcMain.on('global_setProxyConfig', (_event, msg) => Global.setProxyConfig(msg))
   ipcMain.on('global_openFolder', (_event, msg) => Global.openFolder(msg))
   ipcMain.on('global_writeClipboard', (_event, msg) => Global.writeClipboard(msg))
+  ipcMain.on('global_setConfigName', (_event, msg) => Global.setConfigName(msg))
+  ipcMain.on('global_changeConfig', _event => Global.changeConfig())
+  ipcMain.on('global_createConfig', _event => Global.createConfig())
   ipcMain.on('BT_loginAccount', (_event, msg) => BT.loginAccount(msg))
   ipcMain.on('BT_openLoginWindow', (_event, msg) => BT.openLoginWindow(msg))
   ipcMain.on('BT_saveAccountInfo', (_event, msg) => BT.saveAccountInfo(msg))
-  ipcMain.on('BT_clearStorage', (_event) => BT.clearStorage())
+  ipcMain.on('BT_clearStorage', _event => BT.clearStorage())
+  ipcMain.on('BT_removeValidation', _event => BT.removeValidation())
   ipcMain.on('BT_exportCookies', (_event, msg) => BT.exportCookies(msg))
   ipcMain.on('BT_importCookies', (_event, msg) => BT.importCookies(msg))
+  ipcMain.on('BT_saveAcgnXAPIConfig', (_event, msg) => BT.saveAcgnXAPIConfig(msg))
   ipcMain.on('forum_saveAccountInfo', (_event, msg) => Forum.saveAccountInfo(msg))
   ipcMain.on('task_removeTask', (_event, msg) => Task.removeTask(msg))
   ipcMain.on('task_setTaskProcess', (_event, msg) => Task.setTaskProcess(msg))
@@ -2769,6 +3006,13 @@ app.whenReady().then(async () => {
   // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+  })
+
+  cfView = new WebContentsView()
+  cfView.webContents.on('did-finish-load', async () => {
+    cssKey.forEach(item => { cfView.webContents.removeInsertedCSS(item) })
+    cssKey.push(await cfView.webContents.insertCSS('body {overflow: hidden;}'))
+    cssKey.push(await cfView.webContents.insertCSS('.cf-turnstile { position: fixed; left: 0px; top: 0px}'))
   })
 
   createWindow()

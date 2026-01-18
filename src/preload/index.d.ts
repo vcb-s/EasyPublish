@@ -3,19 +3,24 @@ export interface IElectronAPI {
 
 export interface GlobalAPI {
   winHandle: (msg: string) => void
+  getConfigName: () => Promise<string>
   getProxyConfig: () => Promise<string>
   setProxyConfig: (config: string) => void
   getFilePath: (msg: string) => Promise<string>
   getFolderPath: () => Promise<string>
   openFolder: (msg: string) => void
+  changeConfig: () => void
+  createConfig: () => void
   writeClipboard: (msg: string) => void
+  setConfigName: (msg: string) => void
   readFileContent: () => Promise<string>
   html2markdown: (msg: string) => Promise<string>
   html2bbcode: (msg: string) => Promise<string>
 }
 
 export interface BTAPI {
-  loadReCaptcha: (loadReCaptcha: Function) => void
+  loadValidation: (loadValidation: Function) => void
+  closeValidation: (closeValidation: Function) => void
   loadImageCaptcha: (loadImage: Function) => void
   loginAccount: (msg: string) => void
   checkLoginStatus: (msg: string) => Promise<string>
@@ -25,7 +30,10 @@ export interface BTAPI {
   getAccountInfo: (msg: string) => Promise<string>
   importCookies: (msg: string) => void
   exportCookies: (msg: string) => void
+  getAcgnXAPIConfig: () => Promise<string>
+  saveAcgnXAPIConfig: (msg: string) => void
   clearStorage: () => void
+  removeValidation: () => void
   publish: (msg: string) => Promise<string>
   getBangumiTags: (msg: string) => Promise<string>
   searchBangumiTags: (msg: string) => Promise<string>

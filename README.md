@@ -10,15 +10,15 @@ EasyPublish 是一个集发布稿生成、公网发布、主站更新、发布�
 
 ------
 
-## [快速开始](./QUICKSTART.md)
+## [快速指南](./QUICKSTART.md)
+
+## [完整指南](./GUIDE.md)
 
 ## 使用说明
 
 ### 登录管理
 
-![登录管理](readme/08.png)
-
-*新的登录机制仍处于测试阶段，可能尚不稳定。若遇到 BUG 可点击打开网站手动登录。*
+![登录管理](readme/04.png)
 
 在此输入各站的用户名和密码，用以登录各站。或者点击打开网站手动登录，EasyPublish 会在登录窗口关闭时记录登录状态和 Cookie。
 
@@ -32,9 +32,11 @@ EasyPublish 是一个集发布稿生成、公网发布、主站更新、发布�
 
 清除缓存按钮将清除登录窗口的所有缓存并清除 EasyPublish 保存的 Cookie。
 
-页面会自动刷新（如果没出 BUG 的话），所以刷新按钮意义不大。
+![用户名密码](readme/08.png)
 
-![用户名密码](readme/04.png)
+若填写并启用了AcgnX API，发布时会先尝试使用API发布，若发布失败则使用账号发布。因目前官方没有接口验证API是否有效，检查登录无法确认API账户合法，若无效仅会在发布时返回错误。
+
+下方可以修改配置文件名称，支持切换配置文件以满足多账户发布的需求。旧的配置文件会被自动保存，新建配置文件将会使用默认的空配置重启程序。
 
 *（可选功能）* VCB-Studio 主站账户用于发布主站帖，基于 WP RUST API 实现，应用程序密码前往 *仪表盘-个人资料-应用程 密码* 新建。
 
@@ -58,7 +60,7 @@ EasyPublish 不会自动使用系统代理，若非 VPN/TUN 等请先配置代�
 
 任务类型分为从文件创建、从模版创建和快速发布。
 
-更多内容请参考[快速开始](./QUICKSTART.md)。
+更多内容请参考[完整指南](./GUIDEmd)。
 
 ### 管理本地项目
 
@@ -96,7 +98,7 @@ EasyPublish 将获取各站发布的种子列表，并将相同标题的种子�
 
 ## 发布功能说明
 
-具体步骤请参考[快速开始](./QUICKSTART.md)，此处仅为配置项说明。
+具体步骤请参考[完整指南](./GUIDE.md)，此处仅为配置项说明。
 
 ### 编辑发布配置
 
@@ -118,8 +120,6 @@ EasyPublish 将获取各站发布的种子列表，并将相同标题的种子�
 其他站点将根据萌番组和 Nyaa 的分类选择相应分类，分类仅收录部分，若有需要请反馈。
 
 若没有选择 md 文件和 bbcode 文件，将会根据所选的 html 文件生成对应的文件。
-
-点击保存按钮以保存以上配置，点击下一步自动保存并进入复核阶段。
 
 ##### 从模板创建
 
@@ -173,15 +173,13 @@ EasyPublish 将获取各站发布的种子列表，并将相同标题的种子�
 
 ### BT发布
 
-在进行发布之前，请确保账户已登录，并通过了末日动漫的防火墙验证和人机验证。
+在进行发布之前，请确保账户已登录。
 
 EasyPublish 在发布之前会再次检查登录状态，若出现异常请前往登录管理登录账号，再转到管理本地项目继续发布。
 
 对于末日动漫，若遇防火墙阻止将弹出登录页面，请通过人机验证后再次尝试发布。
 
 萌番组有团队同步和非团队同步两种发布方式，任意一项发布完成均不可再次在萌番组发布。
-
-另部分情况下可能出现疑似由网络波动造成的已发布但显示种子已存在，若出现以上情况请携日志反馈。
 
 ### 主站发布
 
@@ -214,6 +212,7 @@ EasyPublish 在发布之前会再次检查登录状态，若出现异常请前�
 | commonmark         | BSD License        | [https://github.com/commonmark/commonmark.js](https://github.com/commonmark/commonmark.js) |
 | markdown-to-bbcode | MIT License        | [https://github.com/ddormer/markdown-to-bbcode](https://github.com/ddormer/markdown-to-bbcode) |
 | Turndown           | MIT License        | [https://github.com/mixmark-io/turndown](https://github.com/mixmark-io/turndown) |
+| vue-codemirror     | MIT License        | [https://github.com/surmon-china/vue-codemirror](https://github.com/surmon-china/vue-codemirror) |
 
 ------
 

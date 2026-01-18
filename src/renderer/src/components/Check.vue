@@ -1,6 +1,11 @@
 <script setup lang="ts" name="Check">
-    import { onMounted, ref, computed } from "vue"
+    import { onMounted, ref, computed, watch } from "vue"
+    import { useDark } from '@vueuse/core'
     import { Edit, RefreshRight, Upload } from '@element-plus/icons-vue'
+    import { Codemirror } from 'vue-codemirror'
+    import { html as codemirror_html } from '@codemirror/lang-html'
+    import { markdown as codemirror_md } from '@codemirror/lang-markdown'
+    import { oneDark } from '@codemirror/theme-one-dark'
     import { marked } from 'marked'
     import bbobHTML from '@bbob/html'
     import presetHTML5 from '@bbob/preset-html5'
@@ -20,6 +25,25 @@
         setHeight()
         window.onresize = setHeight
     }
+
+    //编辑器设置
+    const isDark = useDark()
+    let extensions_html
+    let extensions_md
+    let extensions_bbcode
+    function changeTheme() {
+        if (isDark.value) {
+            extensions_html = [codemirror_html(), oneDark]
+            extensions_md = [codemirror_md(), oneDark]
+            extensions_bbcode = [oneDark]
+        }
+        else {
+            extensions_html = [codemirror_html()]
+            extensions_md = [codemirror_md()]
+            extensions_bbcode = []
+        }
+    }
+    watch(isDark, changeTheme)
 
     //设置展示内容
     const empty = '<div style="height: 200px; align-items: center; display: flex; font-size: xx-large; justify-content: center;"><div>无内容</div></div>';
@@ -110,6 +134,7 @@
 
     onMounted(() => {
         setscrollbar()
+        changeTheme()
         let message: Message.Task.TaskStatus = { id: props.id, step: 'check' }
         window.taskAPI.setTaskProcess(JSON.stringify(message))
         loadData()
@@ -184,34 +209,19 @@
                         <div v-html="html_rendered"></div>
                     </div>
                     <div v-if="type==2">
-                        <el-input
-                            v-model="html"
-                            :autosize="{minRows:10}"
-                            type="textarea"
-                            placeholder="未找到html文件"
-                        />
+                        <codemirror v-model="html" :style="{ minHeight: '400px' }" placeholder="未找到html文件" :extensions="extensions_html" />
                     </div>
                     <div class="container" v-if="type == 3">
                         <div v-html="md_rendered"></div>
                     </div>
                     <div v-if="type==4">
-                        <el-input
-                            v-model="md"
-                            :autosize="{minRows:10}"
-                            type="textarea"
-                            placeholder="未找到md文件"
-                        />
+                        <codemirror v-model="md" :style="{ minHeight: '400px' }" placeholder="未找到md文件" :extensions="extensions_md" />
                     </div>
                     <div class="container" v-if="type==5">
                         <div v-html="bbcode_rendered"></div>
                     </div>
                     <div v-if="type==6">
-                        <el-input
-                            v-model="bbcode"
-                            :autosize="{minRows:10}"
-                            type="textarea"
-                            placeholder="未找到bbcode文件"
-                        />
+                        <codemirror v-model="bbcode" :style="{ minHeight: '400px' }" placeholder="未找到bbcode文件" :extensions="extensions_bbcode" />
                     </div>
                 </el-col>
                 <el-col :span="3" />

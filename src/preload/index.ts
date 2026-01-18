@@ -3,19 +3,24 @@ import { ipcRenderer } from 'electron/renderer'
 
 const globalAPI = {
   getProxyConfig: async () => await ipcRenderer.invoke('global_getProxyConfig'), 
+  getConfigName: async () => await ipcRenderer.invoke('global_getConfigName'),
   getFilePath: async (msg: string) => await ipcRenderer.invoke('global_getFilePath', msg),
   getFolderPath: async () => await ipcRenderer.invoke('global_getFolderPath'),
   readFileContent: async () => await ipcRenderer.invoke('global_readFileContent'),
   html2markdown: async (msg: string) => await ipcRenderer.invoke('global_html2markdown', msg),
   html2bbcode: async (msg: string) => await ipcRenderer.invoke('global_html2bbcode', msg),
+  changeConfig: () => ipcRenderer.send('global_changeConfig'),
+  createConfig: () => ipcRenderer.send('global_createConfig'),
   winHandle: (msg: string) => ipcRenderer.send("global_winHandle", msg) , 
   setProxyConfig: (msg: string) => ipcRenderer.send('global_setProxyConfig', msg), 
   openFolder: (msg: string) => ipcRenderer.send('global_openFolder', msg), 
   writeClipboard: (msg: string) => ipcRenderer.send('global_writeClipboard', msg),
+  setConfigName: (msg: string) => ipcRenderer.send('global_setConfigName', msg),
 }
 
 const BTAPI = {
-  loadReCaptcha: (loadReCaptcha: (msg: string) => void) => ipcRenderer.on('BT_loadReCaptcha', (_event, msg) => loadReCaptcha(msg)),
+  loadValidation: (loadValidation: (msg: string) => void) => ipcRenderer.on('BT_loadValidation', (_event, msg) => loadValidation(msg)),
+  closeValidation: (closeValidation: () => void) => ipcRenderer.on('BT_closeValidation', _event => closeValidation()),
   refreshLoginData: (loadData: () => void) => ipcRenderer.on('BT_refreshLoginData', _event => loadData()),
   loadImageCaptcha: (loadImage: () => void) => ipcRenderer.on('BT_loadIamgeCaptcha', _event => loadImage()),
   getAccountInfo: async (msg: string) => await ipcRenderer.invoke('BT_getAccountInfo', msg),
@@ -27,12 +32,15 @@ const BTAPI = {
   getTorrentDetail: async (msg: string) => await ipcRenderer.invoke('BT_getTorrentDetail', msg), 
   updateTorrent: async (msg: string) => await ipcRenderer.invoke('BT_updateTorrent', msg),
   getTorrentList: async () => await ipcRenderer.invoke('BT_getTorrentList'), 
+  getAcgnXAPIConfig: async () => await ipcRenderer.invoke('BT_getAcgnXAPIConfig'),
   loginAccount: (msg: string) => ipcRenderer.send('BT_loginAccount', msg),
   openLoginWindow: (msg: string) => ipcRenderer.send('BT_openLoginWindow', msg),
   saveAccountInfo: (msg: string) => ipcRenderer.send('BT_saveAccountInfo', msg),
+  saveAcgnXAPIConfig: (msg: string) => ipcRenderer.send('BT_saveAcgnXAPIConfig', msg),
   exportCookies: (msg: string) => ipcRenderer.send('BT_exportCookies', msg),
   importCookies: (msg: string) => ipcRenderer.send('BT_importCookies', msg),
   clearStorage: () => ipcRenderer.send('BT_clearStorage'),
+  removeValidation: () => ipcRenderer.send('BT_removeValidation'),
 }
 
 const forumAPI = {
