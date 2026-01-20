@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, session, clipboard, net, Session, WebContentsView } from 'electron'
-import { join } from 'path'
+import { join, basename } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import fs from 'fs'
 import { JSONFilePreset } from 'lowdb/node'
@@ -25,10 +25,10 @@ function initializeLog() {
   log.transports.file.format = '[{y}-{m}-{d} {h}:{i}:{s}.{ms}] [{level}]{scope} {text}'
   const date = new Date()
   const dateStr = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
-  log.transports.file.resolvePathFn = ()=> app.getPath('userData') + '\\logs\\' + dateStr + '.log'
+  log.transports.file.resolvePathFn = ()=> join(app.getPath('userData'), 'logs',  dateStr + '.log')
   log.initialize()
   console.log = log.log
-  log.info(app.getPath('userData') + '\\logs\\' + dateStr + '.log') 
+  log.info(join(app.getPath('userData'), 'logs',  dateStr + '.log')) 
 }
 initializeLog()
 //默认语言中文
@@ -223,7 +223,7 @@ let mainWindowContentView: Electron.View //用于显示turnstile
 let window: BrowserWindow //改变窗体大小
 function createWindow(): void {
   
-  const partition = 'persist:main' //隔离窗口缓存
+  const partition = 'persist:mainWindow' //隔离窗口缓存
 
   const mainWindow = new BrowserWindow({
     width: 1150,
@@ -233,6 +233,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
+    ...(process.platform === 'linux' ? { appIcon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       partition: partition
@@ -296,9 +297,10 @@ function createWindow(): void {
   })
   //设置代理
   let pconf = userDB.data.proxyConfig
-  session.defaultSession.setProxy({ 
-    proxyRules: `${pconf.type}://${pconf.host}:${pconf.port}` 
-  })
+  if (pconf.status) {
+    session.defaultSession.setProxy({ 
+      proxyRules: `${pconf.type}://${pconf.host}:${pconf.port}` 
+  })}
 
   //监听程序崩溃
   mainWindowWebContent.on('render-process-gone', (_e, detail) => {
@@ -547,27 +549,27 @@ namespace Global {
   //更换配置文件
   export async function changeConfig() {
     await userDB.write()
-    if (!fs.existsSync(`${app.getPath('userData')}\\configs`))
-      fs.mkdirSync(`${app.getPath('userData')}\\configs`)
-    fs.copyFileSync(app.getPath('userData') + '\\easypublish-user-db.json', `${app.getPath('userData')}\\configs\\${userDB.data.name}.json`)
-    fs.rmSync(app.getPath('userData') + '\\easypublish-user-db.json')
+    if (!fs.existsSync(join(app.getPath('userData'), 'configs')))
+      fs.mkdirSync(join(app.getPath('userData'), 'configs'))
+    fs.copyFileSync(join(app.getPath('userData'), 'easypublish-user-db.json'), join(app.getPath('userData'), 'configs', `${userDB.data.name}.json`))
+    fs.rmSync(join(app.getPath('userData'), 'easypublish-user-db.json'))
     const { canceled, filePaths } = await dialog.showOpenDialog({
       properties: ['openFile'], 
       filters: [{name: 'JSON', extensions: ['json']}],
-      defaultPath: `${app.getPath('userData')}\\configs`
+      defaultPath: join(app.getPath('userData'), 'configs')
     })
     if (canceled) return
-    fs.copyFileSync(filePaths[0], app.getPath('userData') + '\\easypublish-user-db.json')
+    fs.copyFileSync(filePaths[0], join(app.getPath('userData'), 'easypublish-user-db.json'))
     app.relaunch()
     app.exit()
   }
   //使用新配置文件启动
   export async function createConfig() {
     await userDB.write()
-    if (!fs.existsSync(`${app.getPath('userData')}\\configs`))
-      fs.mkdirSync(`${app.getPath('userData')}\\configs`)
-    fs.copyFileSync(app.getPath('userData') + '\\easypublish-user-db.json', `${app.getPath('userData')}\\configs\\${userDB.data.name}.json`)
-    fs.rmSync(app.getPath('userData') + '\\easypublish-user-db.json')
+    if (!fs.existsSync(join(app.getPath('userData'), 'configs')))
+      fs.mkdirSync(join(app.getPath('userData'), 'configs'))
+    fs.copyFileSync(join(app.getPath('userData'), 'easypublish-user-db.json'), join(app.getPath('userData'), 'configs', `${userDB.data.name}.json`))
+    fs.rmSync(join(app.getPath('userData'), 'easypublish-user-db.json'))
     app.relaunch()
     app.exit()
   }
@@ -1190,7 +1192,7 @@ namespace BT {
       let uname = info.username
       let pwd = info.password
       formData.append('op', 'login')
-      formData.append('url', 'http%3A%2F%2Fwww.acgnx.se')
+      formData.append('url', 'http%3A%2F%2Fshare.acgnx.se')
       formData.append('emailaddress', uname)
       formData.append('password', pwd)
       formData.append('cookietime', '315360000')
@@ -1310,7 +1312,7 @@ namespace BT {
       let result = ''
       let { id, type }: Message.Task.ContentType = JSON.parse(msg)
       let task = taskDB.data.tasks.find(item => item.id == id)!
-      const config: Config.PublishConfig = await JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+      const config: Config.PublishConfig = await JSON.parse(fs.readFileSync(join(task.path, 'config.json'), {encoding: 'utf-8'}))
       if (type == 'bangumi_all')
         result = await publishBangumi(task, config, true)
       else if (type == 'bangumi')
@@ -1336,8 +1338,8 @@ namespace BT {
   }
   async function publishBangumi(task: Config.Task, config: Config.PublishConfig, sync: boolean) {
     try {
-      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      let html = fs.readFileSync(join(task.path, 'bangumi.html'), {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(join(task.path, config.torrentName))
       const formData = new FormData()
       const team = await axios.get('https://bangumi.moe/api/team/myteam', { responseType: 'json' })
       let team_id: string = team.data[0]._id
@@ -1379,8 +1381,8 @@ namespace BT {
   }
   async function publishNyaa(task: Config.Task, config: Config.PublishConfig) {
     try {
-      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
-      let md = fs.readFileSync(task.path + '\\nyaa.md', {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(join(task.path, config.torrentName))
+      let md = fs.readFileSync(join(task.path, 'nyaa.md'), {encoding: 'utf-8'})
       const formData = new FormData()
       formData.append('torrent_file', new Blob([torrent], {type: 'application/x-bittorrent'}), config.torrentName)
       formData.append('display_name', config.title)
@@ -1417,8 +1419,8 @@ namespace BT {
   }
   async function publishDmhy(task: Config.Task, config: Config.PublishConfig) {
     try {
-      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
-      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(join(task.path, config.torrentName))
+      let html = fs.readFileSync(join(task.path, 'bangumi.html'), {encoding: 'utf-8'})
       const formData = new FormData()
       const team = await axios.get('https://www.dmhy.org/team/myteam', { responseType: 'text'})
       let team_id = (team.data as string).match(/<tbody>[\s\S]*?<td>([\S]*?)<\/td>/)
@@ -1473,8 +1475,8 @@ namespace BT {
   }
   async function publishAcgnxA(task: Config.Task, config: Config.PublishConfig) {
     try {
-      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      let html = fs.readFileSync(join(task.path, 'bangumi.html'), {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(join(task.path, config.torrentName))
       const formData = new FormData()
       if (config.category_bangumi == '54967e14ff43b99e284d0bf7') 
         formData.append('sort_id', '2')
@@ -1547,8 +1549,8 @@ namespace BT {
   }
   async function publishAcgnxG(task: Config.Task, config: Config.PublishConfig) {
     try {
-      let html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
-      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      let html = fs.readFileSync(join(task.path, 'bangumi.html'), {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(join(task.path, config.torrentName))
       const formData = new FormData()
       if (config.category_nyaa == '1_2') 
         formData.append('sort_id', '2')
@@ -1628,8 +1630,8 @@ namespace BT {
   }
   async function publishAcgrip(task: Config.Task, config: Config.PublishConfig) {
     try {
-      let bbcode = fs.readFileSync(task.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
-      const torrent = fs.readFileSync(`${task.path}\\${config.torrentName}`)
+      let bbcode = fs.readFileSync(join(task.path, 'acgrip.bbcode'), {encoding: 'utf-8'})
+      const torrent = fs.readFileSync(join(task.path, config.torrentName))
       const formData = new FormData()
       let date = new Date()
       //CSRF验证
@@ -1818,7 +1820,7 @@ namespace BT {
     //重新尝试获取动漫花园的链接
     if (task.dmhy == '未找到链接') {
       isFinished = 'false'
-      const config: Config.PublishConfig = JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+      const config: Config.PublishConfig = JSON.parse(fs.readFileSync(join(task.path, 'config.json'), {encoding: 'utf-8'}))
       let src = await getDmhyLink(config.title)
       if (src == '')
         task.dmhy = '未找到链接'
@@ -2272,7 +2274,10 @@ namespace BT {
       const response = await axios.post(`https://acg.rip/cp/posts/${id}`, formData, { responseType: 'text' })
       if (response.status == 302)
         return 'success'
-      else return 'failed'
+      else {
+        log.error(response)
+        return 'failed'
+      }
     }
     catch (err) {
       log.error(err)
@@ -2337,7 +2342,7 @@ namespace Forum {
       }
       const img = fs.readFileSync(config.imagePath)
       let imageData = new FormData()
-      imageData.append('file', new Blob([img]), config.imagePath.replace(/^.*[\\\/]/, ''))
+      imageData.append('file', new Blob([img]), basename(config.imagePath))
       const result = await axios.post('https://vcb-s.com/wp-json/wp/v2/media', imageData, { responseType: 'json' })
       if (result.status == 403) {
         message.result = 'forbidden'
@@ -2378,7 +2383,7 @@ namespace Forum {
   }
   //RS主站发布
   export async function rsPublish(msg: string) {
-    let message: Message.Task.Result = { result: ''}
+    let message: Message.Task.Result = { result: '' }
     try{
       let config: Message.Forum.RSConfig = JSON.parse(msg)
       let data = {
@@ -2426,7 +2431,7 @@ namespace Task {
     try{
       let { type, path, name }: Message.Task.TaskConfig = JSON.parse(msg)
       if (path === "") {
-        path = app.getPath('userData') + '\\task'
+        path = join(app.getPath('userData'), 'task')
         if (!fs.existsSync(path))
           fs.mkdirSync(path)
       }
@@ -2437,7 +2442,7 @@ namespace Task {
       else{
         if (name == '')
           name = getNowFormatDate().replace(/:/g, '-')
-        fs.mkdirSync(path + '\\' +  name)
+        fs.mkdirSync(join(path, name))
         let content
         if (type == 'template') {
           content = {
@@ -2481,13 +2486,13 @@ namespace Task {
           torrentPath: '',
           content
         }
-        fs.writeFileSync(path + '\\' +  name + '\\config.json', JSON.stringify(config))
+        fs.writeFileSync(join(path, name, 'config.json'), JSON.stringify(config))
         let id = Date.now()
         taskDB.data.tasks.push({
           id: id,
           type: type,
           name: name,
-          path: path + '\\' + name,
+          path: join(path, name),
           status: 'publishing',
           step: 'edit',
           sync: false
@@ -2548,10 +2553,10 @@ namespace Task {
     let { id }: Message.Task.TaskID = JSON.parse(msg)
     let task = taskDB.data.tasks.find(item => item.id == id)!
     let html = '', md = '', bbcode = '', title = ''
-    html = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
-    md = fs.readFileSync(task.path + '\\nyaa.md', {encoding: 'utf-8'})
-    bbcode = fs.readFileSync(task.path + '\\acgrip.bbcode', {encoding: 'utf-8'})
-    let content: Config.PublishConfig = JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+    html = fs.readFileSync(join(task.path, 'bangumi.html'), {encoding: 'utf-8'})
+    md = fs.readFileSync(join(task.path, 'nyaa.md'), {encoding: 'utf-8'})
+    bbcode = fs.readFileSync(join(task.path, 'acgrip.bbcode'), {encoding: 'utf-8'})
+    let content: Config.PublishConfig = JSON.parse(fs.readFileSync(join(task.path, 'config.json'), {encoding: 'utf-8'}))
     title = content.title
     let result: Message.Task.TaskContents = { html, md, bbcode, title }
     return JSON.stringify(result)
@@ -2561,17 +2566,17 @@ namespace Task {
     let { id, content, type }: Message.Task.ModifiedContent = JSON.parse(msg)
     let task = taskDB.data.tasks.find(item => item.id == id)!
     if (type == 'html')
-      fs.writeFileSync(task.path + '\\bangumi.html', content, {encoding: 'utf-8'})
+      fs.writeFileSync(join(task.path, 'bangumi.html'), content, {encoding: 'utf-8'})
     if (type == 'md')
-      fs.writeFileSync(task.path + '\\nyaa.md', content, {encoding: 'utf-8'})
+      fs.writeFileSync(join(task.path, 'nyaa.md'), content, {encoding: 'utf-8'})
     if (type == 'bbcode')
-      fs.writeFileSync(task.path + '\\acgrip.bbcode', content, {encoding: 'utf-8'})
+      fs.writeFileSync(join(task.path, 'acgrip.bbcode'), content, {encoding: 'utf-8'})
   }
   //保存标题修改
   export async function saveTitle(msg: string) {
     let { id, title }: Message.Task.ModifiedTitle = JSON.parse(msg)
     let task = taskDB.data.tasks.find(item => item.id == id)!
-    let path = task.path + '\\config.json'
+    let path = join(task.path, 'config.json')
     let config: Config.PublishConfig = JSON.parse(fs.readFileSync(path, {encoding: 'utf-8'}))
     config.title = title
     fs.writeFileSync(path, JSON.stringify(config), {encoding: 'utf-8'})
@@ -2580,13 +2585,13 @@ namespace Task {
   export async function exportContent(msg: string) {
     let { id, type }: Message.Task.ContentType = JSON.parse(msg)
     let task = taskDB.data.tasks.find(item => item.id == id)!
-    const {canceled, filePath} = await dialog.showSaveDialog({defaultPath: task.name,filters: [{name: type, extensions: [type]}]})
+    const {canceled, filePath} = await dialog.showSaveDialog({defaultPath: task.name, filters: [{name: type, extensions: [type]}]})
     if (canceled) return
     let filename = ''
-    if (type == 'html') filename = '/bangumi.html'
-    if (type == 'md') filename = '/nyaa.md'
-    if (type == 'bbcode') filename = '/acgrip.bbcode'
-    fs.copyFileSync(task.path + filename, filePath)
+    if (type == 'html') filename = 'bangumi.html'
+    if (type == 'md') filename = 'nyaa.md'
+    if (type == 'bbcode') filename = 'acgrip.bbcode'
+    fs.copyFileSync(join(task.path, filename), filePath)
   }
 
   //获取任务的发布情况
@@ -2611,7 +2616,7 @@ namespace Task {
     try{
       let { id }: Message.Task.TaskID = JSON.parse(msg)
       let task = taskDB.data.tasks.find(item => item.id == id)!
-      const config: Message.Task.PublishConfig = JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+      const config: Message.Task.PublishConfig = JSON.parse(fs.readFileSync(join(task.path, 'config.json'), {encoding: 'utf-8'}))
       return JSON.stringify(config)
     }
     catch(err){
@@ -2658,33 +2663,33 @@ namespace Task {
       let task = taskDB.data.tasks.find(item => item.id == id)
       let info = config.content as Config.Content_file
       if (!task) return 'taskNotFound'
-      fs.writeFileSync(task.path + '\\config.json', JSON.stringify(config))
+      fs.writeFileSync(join(task.path, 'config.json'), JSON.stringify(config))
       if (!fs.existsSync(config.torrentPath)) return "noSuchFile_torrent"
       if (!fs.existsSync(info.path_html))
         return "noSuchFile_html"
       else 
-        fs.copyFileSync(info.path_html, task.path + '\\bangumi.html')
+        fs.copyFileSync(info.path_html, join(task.path, 'bangumi.html'))
       if (!fs.existsSync(info.path_md)) {
         if (info.path_md != '') 
           return 'noSuchFile_md'
-        let content = fs.readFileSync(task.path + '\\bangumi.html', {encoding: 'utf-8'})
+        let content = fs.readFileSync(join(task.path, 'bangumi.html'), {encoding: 'utf-8'})
         var converter = new html2md()
         let md = converter.turndown(content)
-        fs.writeFileSync(task.path + '\\nyaa.md', md)
+        fs.writeFileSync(join(task.path, 'nyaa.md'), md)
       } else
-        fs.copyFileSync(info.path_html, task.path + '\\bangumi.html')
+        fs.copyFileSync(info.path_html, join(task.path, 'bangumi.html'))
       if (!fs.existsSync(info.path_bbcode)) {
         if (info.path_bbcode != '') 
           return 'noSuchFile_bbcode'
-        let content = fs.readFileSync(task.path + '\\nyaa.md', {encoding: 'utf-8'})
+        let content = fs.readFileSync(join(task.path, 'nyaa.md'), {encoding: 'utf-8'})
         let reader = new commonmark.Parser()
         let writer = new md2bbc.BBCodeRenderer()
         let parsed = reader.parse((content as string).replaceAll('\n* * *', ''))
         let bbcode = writer.render(parsed).slice(1).replace(/\[img\salt="[\S]*?"\]/, '[img]')
-        fs.writeFileSync(task.path + '\\acgrip.bbcode', bbcode)
+        fs.writeFileSync(join(task.path, 'acgrip.bbcode'), bbcode)
       } else
-        fs.copyFileSync(info.path_bbcode, task.path + '\\acgrip.bbcode')
-      fs.copyFileSync(config.torrentPath, task.path + '\\' + config.torrentPath.replace(/^.*[\\\/]/, ''))
+        fs.copyFileSync(info.path_bbcode, join(task.path, 'acgrip.bbcode'))
+      fs.copyFileSync(config.torrentPath, join(task.path, basename(config.torrentPath)))
       return 'success'
     } catch (err) {
       dialog.showErrorBox('错误', (err as Error).message)
@@ -2696,10 +2701,10 @@ namespace Task {
       let task = taskDB.data.tasks.find(item => item.id == id)
       let info = config.content as Config.Content_template
       if (!task) return 'taskNotFound'
-      fs.writeFileSync(task.path + '\\config.json', JSON.stringify(config))
+      fs.writeFileSync(join(task.path, 'config.json'), JSON.stringify(config))
       if (!fs.existsSync(config.torrentPath)) return "noSuchFile_torrent"
       let content = '<p>\n'
-      content += `<img src="${info.posterUrl}" alt="${info.posterUrl.replace(/^.*[\\\/]/, '')}" /><br />\n<br />\n`
+      content += `<img src="${info.posterUrl}" alt="${basename(info.posterUrl)}" /><br />\n<br />\n`
       let note = ''
       if (info.note)
         info.note.forEach(item => { 
@@ -2821,10 +2826,10 @@ namespace Task {
       //   info.comparisons_bbcode = info.comparisons_bbcode!.replace(/URL/g, 'url')
       //   bbcode += '\n' + info.comparisons_bbcode
       // }
-      fs.writeFileSync(task.path + '\\bangumi.html', html)
-      fs.writeFileSync(task.path + '\\nyaa.md', md)
-      fs.writeFileSync(task.path + '\\acgrip.bbcode', bbcode)
-      fs.copyFileSync(config.torrentPath, task.path + '\\' + config.torrentPath.replace(/^.*[\\\/]/, ''))
+      fs.writeFileSync(join(task.path, 'bangumi.html'), html)
+      fs.writeFileSync(join(task.path, 'nyaa.md'), md)
+      fs.writeFileSync(join(task.path, 'acgrip.bbcode'), bbcode)
+      fs.copyFileSync(config.torrentPath, join(task.path, basename(config.torrentPath)))
       return 'success'
     } catch (err) {
       dialog.showErrorBox('错误', (err as Error).message)
@@ -2834,7 +2839,7 @@ namespace Task {
   export async function saveConfig(msg: string) {
     let { id, config }: Message.Task.ModifiedConfig = JSON.parse(msg)
     let task = taskDB.data.tasks.find(item => item.id == id)!
-    fs.writeFileSync(task.path + '\\config.json', JSON.stringify(config))
+    fs.writeFileSync(join(task.path, 'config.json'), JSON.stringify(config))
     let result: Message.Task.Result = { result: 'success' }
     return JSON.stringify(result)
   }
@@ -2847,7 +2852,7 @@ namespace Task {
       let result: Message.Forum.Contents = {}
       //从模版创建则生成发布稿
       if (task.type == 'template') {
-        const config: Config.PublishConfig = await JSON.parse(fs.readFileSync(task.path + '\\config.json', {encoding: 'utf-8'}))
+        const config: Config.PublishConfig = await JSON.parse(fs.readFileSync(join(task.path, 'config.json'), {encoding: 'utf-8'}))
         let info = config.content as Config.Content_template
         let note = ''
         if (info.note)
@@ -2923,8 +2928,8 @@ namespace Task {
 
 app.whenReady().then(async () => {
   //设置应用数据库
-  userDB = await JSONFilePreset<Config.UserData>(app.getPath('userData') + '\\easypublish-user-db.json', defaultUserData)
-  taskDB = await JSONFilePreset<Config.TaskData>(app.getPath('userData') + '\\easypublish-task-db.json', defaultTaskData)
+  userDB = await JSONFilePreset<Config.UserData>(join(app.getPath('userData'), 'easypublish-user-db.json'), defaultUserData)
+  taskDB = await JSONFilePreset<Config.TaskData>(join(app.getPath('userData'), 'easypublish-task-db.json'), defaultTaskData)
   await userDB.write()
   await taskDB.write()
   //获取登录窗口回话

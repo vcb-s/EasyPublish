@@ -124,7 +124,7 @@
         for (let i = 0; i < 6; i++) {
             let link = publishInfo.value[i].split('：')[1]
             if (link != '未找到链接' && link != 'undefined')
-                content += `<a href="${link}">${link}</a>\n\n`
+                content += `<a href="${link}" rel="noopener" target="_blank">${link}</a>\n\n`
         }
         return content
     }
@@ -403,7 +403,7 @@
                                     multiple placeholder="选择类别" style="width: 250px" />
                             </el-form-item>
                             <el-form-item label="主站发布稿">
-                                <span><el-button @click="editContent = true" type="primary" link :icon="View">查看发布稿</el-button></span>
+                                <span><el-button @click="editContent = true" type="primary" link :icon="View">查看和编辑发布稿</el-button></span>
                                 <span style="margin-left: 10px;">
                                     <el-button :icon="Upload" type="primary" @click="readFileContent()" link
                                     v-loading.fullscreen.lock="isLoading">
@@ -427,7 +427,7 @@
                                 <p v-for="item in publishInfo" @contextmenu.prevent="handleRightClick(item.split('：')[1])">{{ item }}</p>
                             </div>
                         </el-collapse-item>
-                        <el-collapse-item title="填写模板">
+                        <el-collapse-item title="填写模板（仅从模版创建时有效）">
                             <el-row>
                                 <h3>Credit信息：</h3>
                                 <el-button link style="margin-left: 10px;" @click="addCredit()" :icon="Edit" >添加Credit信息</el-button>

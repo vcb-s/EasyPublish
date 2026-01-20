@@ -21,6 +21,16 @@
         window.onresize = setHeight
     }
 
+    //acgrip转义字符
+    function unescapeHtml(str: string) {
+    str = str.replace(/&lt;/g , "<")
+    str = str.replace(/&gt;/g , ">")
+    str = str.replace(/&quot;/g , "\"")
+    str = str.replace(/&#39;/g , "\'")
+    str = str.replace(/&amp;/g , "&")
+    return str
+    }
+
     //编辑器设置
     const isDark = useDark()
     let extensions
@@ -96,6 +106,7 @@
             let info = data.find(item => item.acgrip && item.acgrip.id == id)!.acgrip!
             if (!info.is_loaded) {
                 info.content = await getDetails<Message.BT.TorrentDetail.AcgripContent>(type, id)
+                info.content!.content = unescapeHtml(info.content!.content)
                 info.is_loaded = true
             }
             let value = info.content!.content.replace(/\n/g, '<br/>')
