@@ -18,7 +18,7 @@
     "build:unpack": "npm run build && electron-builder --dir",
     "build:win": "npm run build && electron-builder -p never --win",
     "build:mac": "npm run build && electron-builder -p never --mac",
-    "build:linux": "npm run build && USE_SYSTEM_FPM=true electron-builder -p never --linux --aarch64"
+    "build:linux": "npm run build && electron-builder -p never --linux"
   },
   "dependencies": {
     "commonmark": "^0.31.2",
