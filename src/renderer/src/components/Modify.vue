@@ -8,6 +8,7 @@
     import { marked } from 'marked'
     import bbobHTML from '@bbob/html'
     import presetHTML5 from '@bbob/preset-html5'
+    import he from 'he'
 
     //设置滚动条区域高度
     const slbHeight = ref('')
@@ -23,12 +24,7 @@
 
     //acgrip转义字符
     function unescapeHtml(str: string) {
-    str = str.replace(/&lt;/g , "<")
-    str = str.replace(/&gt;/g , ">")
-    str = str.replace(/&quot;/g , "\"")
-    str = str.replace(/&#39;/g , "\'")
-    str = str.replace(/&amp;/g , "&")
-    return str
+        return he.decode(str)
     }
 
     //编辑器设置
@@ -90,7 +86,12 @@
         isLoadingContent.value = true
         if (type == 'bangumi') {
             dialogTitle.value = '查看萌番组上的内容'
-            renderedContent.value = data.find(item => item.bangumi && item.bangumi.id == id)!.bangumi!.content!.content
+            let info = data.find(item => item.bangumi && item.bangumi.id === id)!.bangumi!
+            if (!info.is_loaded) {
+                info.content = await getDetails<Message.BT.TorrentDetail.BangumiContent>(type, id)
+                info.is_loaded = true
+            }
+            renderedContent.value = info.content!.content
         }
         if (type == 'nyaa') {
             dialogTitle.value = '查看Nyaa上的内容'
@@ -217,9 +218,8 @@
         try {
             let msg: Message.BT.TorrentInfo = { id, type }
             let result: T = JSON.parse(await window.BTAPI.getTorrentDetail(JSON.stringify(msg)))
-            if (type != 'acgrip') {
-                let doc = new DOMParser().parseFromString(result.content, 'text/html')
-                result.content = doc.documentElement.textContent!
+            if (type != 'acgrip' && type != 'bangumi') {
+                result.content = unescapeHtml(result.content)
             }
             return result
         }
@@ -395,36 +395,36 @@
                     </el-button>
                     <el-table v-loading="isLoading" :data="tabledata" style="width: 100%; height: 100%;">
                         <el-table-column prop="title" label="标题"/>
-                            <el-table-column fixed="left" type="expand" width="50">
-                                <template #default="scope">
-                                    <el-row>
-                                        <el-col :span="1" />
-                                        <el-col :span="22">
-                                            <span><el-button type="primary" link :icon="Edit" 
-                                                @click="multiEdit(scope.row.title)">批量编辑
-                                            </el-button></span>
-                                            <div v-for="(value, key) in (scope.row as Tabledata)">
-                                                <div style="margin-top: 10px; margin-bottom: 10px;" v-if="key != 'title'">
-                                                    <span style="width: 70px; display: inline-block">{{ siteName[key] }}：</span>
-                                                    <span style="margin-left: 10px;"><el-link type="primary" :href="(value as any).url" 
-                                                        :icon="Link" underline="never">打开
-                                                    </el-link></span>
-                                                    <span style="margin-left: 10px;"><el-button type="primary" link :icon="CopyDocument" 
-                                                        @click="writeClipboard((value as any).url)">复制
-                                                    </el-button></span>
-                                                    <span style="margin-left: 10px;"><el-button type="primary" link :icon="View" 
-                                                        @click="openViewDialog(key, (value as any).id)">查看
-                                                    </el-button></span>
-                                                    <span style="margin-left: 10px;"><el-button type="primary" link :icon="Edit" 
-                                                        @click="openEditDialog(key, (value as any).id, scope.row.title)">编辑
-                                                    </el-button></span>
-                                                </div>
+                        <el-table-column fixed="left" type="expand" width="50">
+                            <template #default="scope">
+                                <el-row>
+                                    <el-col :span="1" />
+                                    <el-col :span="22">
+                                        <span><el-button type="primary" link :icon="Edit" 
+                                            @click="multiEdit(scope.row.title)">批量编辑
+                                        </el-button></span>
+                                        <div v-for="(value, key) in (scope.row as Tabledata)">
+                                            <div style="margin-top: 10px; margin-bottom: 10px;" v-if="key != 'title'">
+                                                <span style="width: 70px; display: inline-block">{{ siteName[key] }}：</span>
+                                                <span style="margin-left: 10px;"><el-link type="primary" :href="(value as any).url" 
+                                                    :icon="Link" underline="never">打开
+                                                </el-link></span>
+                                                <span style="margin-left: 10px;"><el-button type="primary" link :icon="CopyDocument" 
+                                                    @click="writeClipboard((value as any).url)">复制
+                                                </el-button></span>
+                                                <span style="margin-left: 10px;"><el-button type="primary" link :icon="View" 
+                                                    @click="openViewDialog(key, (value as any).id)">查看
+                                                </el-button></span>
+                                                <span style="margin-left: 10px;"><el-button type="primary" link :icon="Edit" 
+                                                    @click="openEditDialog(key, (value as any).id, scope.row.title)">编辑
+                                                </el-button></span>
                                             </div>
-                                        </el-col>
-                                        <el-col :span="1" />
-                                    </el-row>
-                                </template>
-                            </el-table-column>
+                                        </div>
+                                    </el-col>
+                                    <el-col :span="1" />
+                                </el-row>
+                            </template>
+                        </el-table-column>
                     </el-table>
                 </el-col>
                 <el-col :span="3" />

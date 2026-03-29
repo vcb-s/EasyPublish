@@ -12,6 +12,7 @@ import commonmark from "commonmark"
 import md2bbc from 'markdown-to-bbcode'
 import html2md from 'turndown'
 import CryptoJS from 'crypto-js'
+import he from 'he'
 
 //静态资源
 import nyaaResponse from '../renderer/src/assets/nyaa.html?asset'
@@ -151,20 +152,10 @@ function getCurrentTime() {
 }
 //转义实体字符
 function escapeHtml(str: string) {
-  str = str.replace(/&/g, "&amp;")
-  str = str.replace(/</g, "&lt;")
-  str = str.replace(/>/g, "&gt;")
-  str = str.replace(/"/g, "&quot;")
-  str = str.replace(/'/g, "&#39;")
-  return str
+  return he.encode(str)
 }
 function unescapeHtml(str: string) {
-  str = str.replace(/&lt;/g , "<")
-  str = str.replace(/&gt;/g , ">")
-  str = str.replace(/&quot;/g , "\"")
-  str = str.replace(/&#39;/g , "\'")
-  str = str.replace(/&amp;/g , "&")
-  return str
+  return he.decode(str)
 }
 
 const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36'
@@ -608,7 +599,6 @@ namespace BT {
         else {
           if (type == 'bangumi') {
             await checkBangumiLoginStatus(info)
-            await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录')
               if (info.username != '' && info.password != '') 
@@ -616,7 +606,6 @@ namespace BT {
           }
           if (type == 'acgrip') {
             await checkAcgripLoginStatus(info)
-            await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录')
               if (info.username != '' && info.password != '') 
@@ -624,7 +613,6 @@ namespace BT {
           }
           if (type == 'nyaa') {
             await checkNyaaLoginStatus(info)
-            await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录') {
               if (info.username != '' && info.password != '') {
@@ -635,7 +623,6 @@ namespace BT {
           }
           if (type == 'acgnx_a') {
             await checkAcgnxALoginStatus(info)
-            await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录') {
               if (info.username != '' && info.password != '') {
@@ -646,7 +633,6 @@ namespace BT {
           }
           if (type == 'acgnx_g') {
             await checkAcgnxGLoginStatus(info)
-            await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录'){
               if (info.username != '' && info.password != '') { 
@@ -657,7 +643,6 @@ namespace BT {
           }
           if (type == 'dmhy') {
             await checkDmhyLoginStatus(info)
-            await userDB.write()
             mainWindowWebContent.send('BT_refreshLoginData')
             if (info.status == '账号未登录'){
               if (info.username != '' && info.password != '') { 
@@ -713,11 +698,13 @@ namespace BT {
         info.time = getCurrentTime()
         info.status = '账号已登录'
       }
+      await userDB.write()
     }
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
       info.status = '访问失败'
+      await userDB.write()
     }
   }
   async function checkNyaaLoginStatus(info: Config.LoginInfo) {
@@ -742,11 +729,13 @@ namespace BT {
       else {
         throw response
       }
+      await userDB.write()
     }
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
       info.status = '访问失败'
+      await userDB.write()
     }
   }
   async function checkAcgripLoginStatus(info: Config.LoginInfo) {
@@ -771,11 +760,13 @@ namespace BT {
       else {
         throw response
       }
+      await userDB.write()
     }
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
       info.status = '访问失败'
+      await userDB.write()
     }
   }
   async function checkDmhyLoginStatus(info: Config.LoginInfo) {
@@ -800,11 +791,13 @@ namespace BT {
       else {
         throw response
       }
+      await userDB.write()
     }
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
       info.status = '访问失败'
+      await userDB.write()
     }
   }
   async function checkAcgnxGLoginStatus(info: Config.LoginInfo) {
@@ -841,11 +834,13 @@ namespace BT {
       else {
         throw response
       }
+      await userDB.write()
     }
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
       info.status = '访问失败'
+      await userDB.write()
     }
   }
   async function checkAcgnxALoginStatus(info: Config.LoginInfo) {
@@ -882,11 +877,13 @@ namespace BT {
       else {
         throw response
       }
+      await userDB.write()
     }
     catch (err) {
       log.error(err)
       info.time = getCurrentTime()
       info.status = '访问失败'
+      await userDB.write()
     }
   }
 
@@ -1940,12 +1937,7 @@ namespace BT {
           detail: {
             id: item._id,
             url: 'https://bangumi.moe/torrent/' + item._id,
-            is_loaded: true,
-            content: {
-              category_tag_id: item.category_tag_id,
-              tag_ids: item.tag_ids,
-              content: item.introduction
-            }
+            is_loaded: false
           }
         })
       })
@@ -2071,7 +2063,18 @@ namespace BT {
       result = await getAcgnxTorrentDetail(true, id)
     if (type == 'dmhy')
       result = await getDmhyTorrentDetail(id)
+    if (type == 'bangumi')
+      result = await getBangumiTorrentDetail(id)
     return JSON.stringify(result)
+  }
+  async function getBangumiTorrentDetail(id: string) {
+    let response = await axios.post(`https://bangumi.moe/api/torrent/fetch`, { _id: id }, { responseType: 'json'})
+    let result: Message.BT.TorrentDetail.BangumiContent = {
+      category_tag_id: response.data.category_tag_id,
+      tag_ids: response.data.tag_ids,
+      content: response.data.introduction
+    }
+    return result
   }
   async function getNyaaTorrentDetail(id: string) {
     try {
@@ -2820,7 +2823,7 @@ namespace Task {
       let reader = new commonmark.Parser()
       let bbcodeWriter = new md2bbc.BBCodeRenderer()
       let parsed_bbcode = reader.parse((md as string).replaceAll('\n* * *', ''))
-      let bbcode = bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\s\S]*?"\]/g, '[img]')
+      let bbcode = he.decode(bbcodeWriter.render(parsed_bbcode).slice(1).replace(/\[img\salt="[\s\S]*?"\]/g, '[img]'))
       let html = content
       // if (!info.reseed) {
       //   md += '\n\n' +  info.comparisons_md

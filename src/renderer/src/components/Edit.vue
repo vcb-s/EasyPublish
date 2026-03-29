@@ -619,7 +619,7 @@
     })
     async function getBangumiTags() {
         let title = generateTitle()
-        let msg: Message.BT.BangumiQuery = { query: taskType.value == 'template' ? config.title : title }
+        let msg: Message.BT.BangumiQuery = { query: taskType.value == 'template' ? title : config.title }
         const {data, status}: Message.BT.BangumiTags = JSON.parse(await window.BTAPI.getBangumiTags(JSON.stringify(msg)))
         if (status == 200) {
             suggestedBangumiTags.value = []

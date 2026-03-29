@@ -38,6 +38,8 @@ dmg:
   artifactName: ${productName}-${version}.${ext}
 linux:
   target:
+    - AppImage
+    - snap
     - deb
   maintainer: Asendaushoe
   icon: ./build/icon.png
